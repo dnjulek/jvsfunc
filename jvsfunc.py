@@ -46,6 +46,33 @@ def FreezeFramesMod(src, mode=1, ranges=None, single=False):
 
 ffmod = FreezeFramesMod
 
+def replace_keyframe(src, thr=0.30, show_thr=False):
+    """
+    Replace the frame after a scene change with the next frame. Helps to fix broken keyframes.
+
+    Parameters:
+    src:        Input clip.
+    thr:        Threshold is the difference between the two frames, it must be high enough to ignore artifacts 
+                and low enough to avoid freezing moving scenes. Default is 0.30.
+    show_thr:   Shows the threshold of the frame. This also disable the replacement for a better frame seeking in preview.
+    """
+    def _show_thr(n, f, clip):
+        return clip.sub.Subtitle("Frame " + str(n) + " of " + str(clip.num_frames) + "\nCurrent thr: {}".format(str(f.props.PlaneStatsDiff * 100)))
+
+    def _schang(n, f, clip, thr):
+        if f.props._SceneChangePrev == 1 and f.props.PlaneStatsDiff * 100 < thr:
+            return clip[n+1]
+        else:
+            return clip
+    
+    diff = core.std.PlaneStats(clip, clip[1:])
+
+    if show_thr:
+        return core.std.FrameEval(src, partial(_show_thr, clip=src), prop_src=diff)
+
+    xvid = diff.resize.Bilinear(640, 360, format=vs.YUV420P8).scxvid.Scxvid()
+    return core.std.FrameEval(src, partial(_schang, clip=src, thr=thr), prop_src=xvid)
+
 def find_comb(src, name='comb_list'):
     """
     Creates a VSEdit Bookmarks file with a list of combed frames, to be used in scene filtering.
