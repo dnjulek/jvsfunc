@@ -85,6 +85,57 @@ def replace_keyframe(src, thr=0.30, keyframe_list=None, show_thr=False):
     
     return core.std.FrameEval(src, partial(_schang_list, clip=src, thr=thr, klist=keyframe_list), prop_src=diff)
 
+def JIVTC_Deblend(src, pattern, chroma_only=True, tff=True):
+    """
+    fvsfunc.JIVTC() modified to use a deblend based on lvsfunc instead of original bobber (yadifmod).
+
+    JIVTC_Deblend works similar to the original, and follows the same A, AB, BC, C, D pattern.
+    This function should only be used when a normal ivtc or ivtc+bobber leaves chroma blend to a every fourth frame.
+    You can disable chroma_only to use in luma as well, but it is not recommended.
+    
+    Parameters:
+    clip   src:                  Source clip. Has to be 60i (30000/1001).
+    int    pattern:              First frame of any clean-combed-combed-clean-clean sequence.
+    bool   chroma_only (True):   If set to False, luma will also receive deblend process.
+    bool   tff (True):           Set top field first (True) or bottom field first (False).
+    """
+    if src.fps_num != 30000 or src.fps_den != 1001:
+        raise ValueError('JIVTC_Deblend: This filter can only be used with 60i clips.')
+    
+    pattern = pattern % 5
+    def deblend(src):
+        blends_a = range(1, src.num_frames - 1, 5)
+        blends_b = range(2, src.num_frames - 1, 5)
+
+        def calculate(n, f, src):
+            if n % 5 in [0, 3, 4]:
+                return src
+            else:
+                if n in blends_a:
+                    a, ab, bc, c = src[n - 1], src[n], src[n + 1], src[n + 2]
+                    dbd = core.std.Expr([a, ab, bc, c], "z a 2 / - y x 2 / - +")
+                    dbd = dbd.vinverse.Vinverse()
+                    return dbd if f.props._Combed == 1 else src
+                return src
+        
+        dbd = core.std.FrameEval(src, partial(calculate, src=src), src.tdm.IsCombed())
+        return core.std.DeleteFrames(dbd, blends_b).std.AssumeFPS(fpsnum=24000, fpsden=1001)
+	
+    defivtc = core.std.SeparateFields(src, tff=tff).std.DoubleWeave()
+    selectlist = [[0,3,6,8], [0,2,5,8], [0,2,4,7], [2,4,6,9], [1,4,6,8]]
+    ivtced = core.std.SelectEvery(defivtc, 10, selectlist[pattern])
+	
+    selectlist = [deblend(src), ivtced[:1]+deblend(src[1:]), ivtced[:2]+deblend(src[2:]), ivtced[:2]+deblend(src[3:]), ivtced[:3]+deblend(src[4:])]
+    deblended = selectlist[pattern]
+	
+    inter = core.std.Interleave([ivtced, deblended])
+    selectlist = [[0,3,4,6], [0,2,5,6], [0,2,4,7], [0,2,4,7], [1,2,4,6]]
+    final = core.std.SelectEvery(inter, 8, selectlist[pattern])
+	
+    final_y = core.std.ShufflePlanes([ivtced, final, final], [0, 1, 2], vs.YUV)
+    final = final_y if chroma_only else final
+    return core.std.SetFrameProp(final, prop='_FieldBased', intval=0)
+
 def find_comb(src, name='comb_list'):
     """
     Creates a VSEdit Bookmarks file with a list of combed frames, to be used in scene filtering.
