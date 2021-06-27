@@ -4,7 +4,7 @@ from math import sqrt
 import vapoursynth as vs
 core = vs.core
 
-def dehalo_mask(src, expand=0.5, iterations=2):
+def dehalo_mask(src, expand=0.5, iterations=2, brz=255):
     """
     Based on muvsfunc.YAHRmask(), stand-alone version with some tweaks.
 
@@ -12,7 +12,11 @@ def dehalo_mask(src, expand=0.5, iterations=2):
     clip    src:            Input clip. I suggest to descale (if possible) and nnedi3_rpow2 first, for a cleaner mask.
     float   expand (0.5):   Expansion of edge mask.
     int     iterations (2): Protects parallel lines and corners that are usually damaged by YAHR.
+    int     brz (255):      Adjusts the internal line thickness.
     """
+    if brz > 255 or brz < 0:
+        raise ValueError('dehalo_mask: brz must be between 0 and 255.')
+    
     is8 = src.format.bits_per_sample == 8
     src_b = src if is8 else depth(src, 8)#8 bit only because the result in 16 is the same but slower
     luma = get_y(src_b)
@@ -20,8 +24,11 @@ def dehalo_mask(src, expand=0.5, iterations=2):
     mask1 = vEdge.tcanny.TCanny(sigma=sqrt(expand*2), mode=-1).std.Expr(['x 16 *'])
     mask2 = iterate(vEdge, core.std.Maximum, iterations)
     mask2 = iterate(mask2, core.std.Minimum, iterations)
-    mask2 = mask2.std.Convolution(matrix=[1, 2, 1, 2, 4, 2, 1, 2, 1]).std.Invert()
-    mask = core.std.Expr([mask1, mask2], ['x y min'])
+    mask2 = mask2.std.Invert().std.Binarize(80)
+    mask3 = mask2.std.Inflate().std.Inflate().std.Binarize(brz)
+    mask4 = mask3 if brz < 255 else mask2
+    mask4 = mask4.std.Convolution(matrix=[1, 2, 1, 2, 4, 2, 1, 2, 1])
+    mask = core.std.Expr([mask1, mask4], ['x y min'])
     return mask if is8 else depth(mask, src.format.bits_per_sample)
 
 def FreezeFramesMod(src, mode='prev', ranges=None, single=False):
