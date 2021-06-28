@@ -207,28 +207,28 @@ def _bookmarks(flist, name):
     text_file.close()
 
 def _rng(flist1, min_length):
-	flist2 = []
-	flist3 = []
-	prev_n = -1
+    flist2 = []
+    flist3 = []
+    prev_n = -1
 
-	for n in flist1:
-		if prev_n+1 != n:
-			if flist3:
-				flist2.append(flist3)
-				flist3 = []
-		flist3.append(n)
-		prev_n = n
+    for n in flist1:
+        if prev_n+1 != n:
+            if flist3:
+                flist2.append(flist3)
+                flist3 = []
+        flist3.append(n)
+        prev_n = n
 
-	if flist3:
-		flist2.append(flist3)
+    if flist3:
+        flist2.append(flist3)
 
-	flist4 = [i for i in flist2 if len(i) > min_length]
-	first_frame = [i[0] for i in flist4]
-	last_frame = [i[-2] for i in flist4]
-	final = first_frame + last_frame
-	final[::2] = first_frame
-	final[1::2] = last_frame
-	return final
+    flist4 = [i for i in flist2 if len(i) > min_length]
+    first_frame = [i[0] for i in flist4]
+    last_frame = [i[-2] for i in flist4]
+    final = first_frame + last_frame
+    final[::2] = first_frame
+    final[1::2] = last_frame
+    return final
 
 _progress = Progress(TextColumn("{task.description}"),
                 BarColumn(),
