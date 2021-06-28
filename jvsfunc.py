@@ -1,3 +1,6 @@
+from lvsfunc.progress import Progress, BarColumn, FPSColumn, TextColumn, TimeRemainingColumn
+from lvsfunc.render import clip_async_render
+from lvsfunc.util import get_prop
 from vsutil import get_y, depth, iterate
 from functools import partial
 from math import sqrt
@@ -151,15 +154,21 @@ def find_comb(src, name='comb_list'):
     clip    src:                Input clip.
     str     name ('comb_list'): Output file name.
     """
-    name += '.bookmarks'
+    frames = []
     src = depth(src, 8) if src.format.bits_per_sample != 8 else src
-    find = core.tdm.IsCombed(src)
-    diff = core.std.PlaneStats(find)
-    frames = [i for i,f in enumerate(diff.frames()) if f.props._Combed == 1]
-    frames = str(frames)[1:-1]
-    text_file = open(name, 'w')
-    text_file.write(frames)
-    text_file.close()
+    find = core.tdm.IsCombed(src).std.PlaneStats()
+
+    with _progress:
+        task = _progress.add_task("Searching combed...", total=find.num_frames)
+
+        def _cb(n, f) -> None:
+            _progress.update(task, advance=1)
+            p = get_prop(f, "_Combed", int)
+            if p == 1:
+                frames.append(n)
+
+        clip_async_render(find, callback=_cb)
+    frames = _bookmarks(frames, name)
 
 def find_60p(src, min_length=60, name='60p_ranges'):
     """
@@ -170,36 +179,60 @@ def find_60p(src, min_length=60, name='60p_ranges'):
     int     min_length (60):        Non 60 fps consecutive frames needed to end a range.
     str     name ('60p_ranges'):    Output file name.
     """
-    name +='.bookmarks'
     if src.fps_num != 30000 or src.fps_den != 1001:
         raise ValueError('find_60p: This script can only be used with 60i clips.')
     
-    src = core.vivtc.VFM(src, order=1, mode=2)
-    frames = [i for i,f in enumerate(src.frames()) if f.props._Combed == 0]
-    a = frames
-    b = []
-    subList = []
-    prev_n = -1
+    frames = []
+    find = core.vivtc.VFM(src, order=1, mode=2)
 
-    for n in a:
-        if prev_n+1 != n:
-            if subList:
-                b.append(subList)
-                subList = []
-        subList.append(n)
-        prev_n = n
+    with _progress:
+        task = _progress.add_task("Searching 60 fps ranges...", total=find.num_frames)
 
-    if subList:
-        b.append(subList)
+        def _cb(n, f) -> None:
+            _progress.update(task, advance=1)
+            p = get_prop(f, "_Combed", int)
+            if p == 0:
+                frames.append(n)
 
-    frames2 = [i for i in b if len(i) > min_length]
-    first_frame = [i[0] for i in frames2]
-    last_frame = [i[-2] for i in frames2]
-    final = first_frame + last_frame
-    final[::2] = first_frame
-    final[1::2] = last_frame
+        clip_async_render(find, callback=_cb)
+    
+    frames = _rng(frames, min_length)
+    frames = _bookmarks(frames, name)
 
-    sfinal = str(final)[1:-1]
-    text_file = open(name,'w')
-    text_file.write(sfinal)
+def _bookmarks(flist, name):
+    name += '.bookmarks'
+    frames = str(flist)[1:-1]
+    text_file = open(name, 'w')
+    text_file.write(frames)
     text_file.close()
+
+def _rng(flist1, min_length):
+	flist2 = []
+	flist3 = []
+	prev_n = -1
+
+	for n in flist1:
+		if prev_n+1 != n:
+			if flist3:
+				flist2.append(flist3)
+				flist3 = []
+		flist3.append(n)
+		prev_n = n
+
+	if flist3:
+		flist2.append(flist3)
+
+	flist4 = [i for i in flist2 if len(i) > min_length]
+	first_frame = [i[0] for i in flist4]
+	last_frame = [i[-2] for i in flist4]
+	final = first_frame + last_frame
+	final[::2] = first_frame
+	final[1::2] = last_frame
+	return final
+
+_progress = Progress(TextColumn("{task.description}"),
+                BarColumn(),
+                TextColumn("{task.completed}/{task.total}"),
+                TextColumn("{task.percentage:>3.02f}%"),
+                FPSColumn(),
+                TimeRemainingColumn())
