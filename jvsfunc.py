@@ -169,6 +169,41 @@ def find_comb(src, name='comb_list'):
 
         clip_async_render(find, callback=_cb)
     frames = _bookmarks(frames, name)
+    return find
+
+def find_30p(src, min_length=34, thr=2000, name='30p_ranges', show_thr=False):
+    """
+    Creates a VSEdit Bookmarks file with possible 30 fps ranges from a VFR (interlaced) clip, to be used in scene filtering.
+
+    Parameters:
+    clip    src:                    Input clip. Has to be 60i (30000/1001).
+    int     min_length (34):        Non 30 fps consecutive frames needed to end a range.
+    int     thr (2000):             Threshold for the frame not to be considered a duplicate.
+    str     name ('30p_ranges'):    Output file name.
+    bool    show_thr (False):       Shows the threshold of the frame.
+    """
+    if src.fps_num != 30000 or src.fps_den != 1001:
+        raise ValueError('find_30p: This script can only be used with 60i clips.')
+    
+    frames = []
+    find = core.vivtc.VFM(src, order=1, mode=0).vivtc.VDecimate(dryrun=True)
+    if show_thr:
+        return core.text.FrameProps(find, "VDecimateMaxBlockDiff")
+
+    with _progress:
+        task = _progress.add_task("Searching 30 fps ranges...", total=find.num_frames)
+
+        def _cb(n, f) -> None:
+            _progress.update(task, advance=1)
+            p = get_prop(f, "VDecimateMaxBlockDiff", int)
+            if p > thr:
+                frames.append(n)
+
+        clip_async_render(find, callback=_cb)
+    
+    frames = _rng(frames, min_length)
+    frames = _bookmarks(frames, name)
+    return find
 
 def find_60p(src, min_length=60, name='60p_ranges'):
     """
@@ -198,6 +233,7 @@ def find_60p(src, min_length=60, name='60p_ranges'):
     
     frames = _rng(frames, min_length)
     frames = _bookmarks(frames, name)
+    return find
 
 def _bookmarks(flist, name):
     name += '.bookmarks'
