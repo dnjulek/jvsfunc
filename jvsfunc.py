@@ -1,4 +1,3 @@
-from lvsfunc.progress import Progress, BarColumn, FPSColumn, TextColumn, TimeRemainingColumn
 from lvsfunc.render import clip_async_render
 from lvsfunc.util import get_prop
 from vsutil import get_y, depth, iterate
@@ -158,16 +157,11 @@ def find_comb(src, name='comb_list'):
     src = depth(src, 8) if src.format.bits_per_sample != 8 else src
     find = core.tdm.IsCombed(src).std.PlaneStats()
 
-    with _progress:
-        task = _progress.add_task("Searching combed...", total=find.num_frames)
+    def _cb(n, f):
+        if get_prop(f, "_Combed", int) == 1:
+            frames.append(n)
 
-        def _cb(n, f) -> None:
-            _progress.update(task, advance=1)
-            p = get_prop(f, "_Combed", int)
-            if p == 1:
-                frames.append(n)
-
-        clip_async_render(find, callback=_cb)
+    clip_async_render(find, progress="Searching combed...", callback=_cb)
     frames = _bookmarks(frames, name)
     return find
 
@@ -190,17 +184,11 @@ def find_30p(src, min_length=34, thr=2000, name='30p_ranges', show_thr=False):
     if show_thr:
         return core.text.FrameProps(find, "VDecimateMaxBlockDiff")
 
-    with _progress:
-        task = _progress.add_task("Searching 30 fps ranges...", total=find.num_frames)
+    def _cb(n, f):
+        if get_prop(f, "VDecimateMaxBlockDiff", int) > thr:
+            frames.append(n)
 
-        def _cb(n, f) -> None:
-            _progress.update(task, advance=1)
-            p = get_prop(f, "VDecimateMaxBlockDiff", int)
-            if p > thr:
-                frames.append(n)
-
-        clip_async_render(find, callback=_cb)
-    
+    clip_async_render(find, progress="Searching 30 fps ranges...", callback=_cb)
     frames = _rng(frames, min_length)
     frames = _bookmarks(frames, name)
     return find
@@ -220,17 +208,11 @@ def find_60p(src, min_length=60, name='60p_ranges'):
     frames = []
     find = core.vivtc.VFM(src, order=1, mode=2)
 
-    with _progress:
-        task = _progress.add_task("Searching 60 fps ranges...", total=find.num_frames)
+    def _cb(n, f):
+        if get_prop(f, "_Combed", int) == 0:
+            frames.append(n)
 
-        def _cb(n, f) -> None:
-            _progress.update(task, advance=1)
-            p = get_prop(f, "_Combed", int)
-            if p == 0:
-                frames.append(n)
-
-        clip_async_render(find, callback=_cb)
-    
+    clip_async_render(find, progress="Searching 60 fps ranges...", callback=_cb)
     frames = _rng(frames, min_length)
     frames = _bookmarks(frames, name)
     return find
@@ -265,10 +247,3 @@ def _rng(flist1, min_length):
     final[::2] = first_frame
     final[1::2] = last_frame
     return final
-
-_progress = Progress(TextColumn("{task.description}"),
-                BarColumn(),
-                TextColumn("{task.completed}/{task.total}"),
-                TextColumn("{task.percentage:>3.02f}%"),
-                FPSColumn(),
-                TimeRemainingColumn())
