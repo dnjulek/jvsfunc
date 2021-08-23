@@ -194,7 +194,7 @@ def jdeblend_kf(src, src_fm):
     Should be used after jdeblend() to fix scene changes.
 
     Parameters:
-    clip   src:                 Untouched source.
+    clip   src:                 Source after jdeblend().
     clip   src_fm:              Source after field matching, must have field=3 and low cthresh.
     """
 
