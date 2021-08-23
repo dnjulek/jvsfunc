@@ -145,6 +145,69 @@ def JIVTC_Deblend(src, pattern, chroma_only=True, tff=True):
     final = final_y if chroma_only else final
     return core.std.SetFrameProp(final, prop='_FieldBased', intval=0)
 
+def jdeblend(src_fm, src, vinverse=True):
+    """
+    Automatically deblends if normal field matching leaves 2 blends every 5 frames (like avs's ExBlend).
+
+    Parameters:
+    clip   src_fm:              Source after field matching, must have field=3 and low cthresh.
+    clip   src:                 Untouched source.
+    bool   vinverse (True):     Vinverse for post processing.
+
+    Example:
+    src = 
+    vfm = src.vivtc.VFM(order=1, field=3, cthresh=3)
+    dblend = jdeblend(vfm, src)
+    dblend = core.std.ShufflePlanes([vfm, dblend], [0, 1, 2], vs.YUV)
+    dblend = jdeblend_kf(dblend, vfm)
+    """
+
+    def deblend(src):
+        blends = range(1, src.num_frames - 1, 5)
+        def calculate(n, src):
+            if n % 5 in [0, 3, 4]:
+                return src
+            else:
+                if n in blends:
+                    a, ab, bc, c = src[n - 1], src[n], src[n + 1], src[n + 2]
+                    dbd = core.std.Expr([a, ab, bc, c], "z a 2 / - y x 2 / - +")
+                    return dbd
+                return src
+        return core.std.FrameEval(src, partial(calculate, src=src))
+
+    def calculate(n, f, src):
+        avg = [f[i].props['PlaneStatsAverage'] for i in range(1, 7)]
+        comb = [f[i].props['_Combed'] for i in [0, 7]]
+        avg, ref = avg[:5], avg[5]
+        src, out = src[1:], src[0]
+        if comb[0] == 1:
+            out = src[avg.index([i for i in avg if i != ref][0])]
+            out = out.vinverse.Vinverse() if vinverse else out
+        return out[n+1] if sum(comb) == 2 else out
+       
+    db_list = [deblend(src), src[:1]+deblend(src[1:]), src[:2]+deblend(src[2:]), src[:3]+deblend(src[3:]), src[:4]+deblend(src[4:])]
+    clist = [src_fm, db_list[0], db_list[1], db_list[2], db_list[3], db_list[4], src, src_fm[0]+src_fm[:-1]]
+    return core.std.FrameEval(src_fm, partial(calculate, src=clist[:6]), [core.std.PlaneStats(i) for i in clist])
+
+def jdeblend_kf(src, src_fm):
+    """
+    Should be used after jdeblend() to fix scene changes.
+
+    Parameters:
+    clip   src:                 Untouched source.
+    clip   src_fm:              Source after field matching, must have field=3 and low cthresh.
+    """
+
+    def keyframe(n, f, src):
+        keyfm = [f[i].props['VFMSceneChange'] for i in [0, 1]]
+        kf_end = sum(keyfm) == 1
+        kf_start = sum(keyfm) == 2
+        is_cmb = f[0].props['_Combed'] == 1
+        src = src[n-1] if kf_end and is_cmb else src
+        return src[n+1] if kf_start and is_cmb else src
+
+    return core.std.FrameEval(src, partial(keyframe, src=src), [src_fm, src_fm[0]+src_fm[:-1]])
+
 def find_comb(src, name='comb_list'):
     """
     Creates a VSEdit Bookmarks file with a list of combed frames, to be used in scene filtering.
