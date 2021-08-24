@@ -162,18 +162,15 @@ def jdeblend(src_fm, src, vinverse=True):
     dblend = jdeblend_kf(dblend, vfm)
     """
 
-    def deblend(src):
-        blends = range(1, src.num_frames - 1, 5)
-        def calculate(n, src):
-            if n % 5 in [0, 3, 4]:
-                return src
-            else:
-                if n in blends:
-                    a, ab, bc, c = src[n - 1], src[n], src[n + 1], src[n + 2]
-                    dbd = core.std.Expr([a, ab, bc, c], "z a 2 / - y x 2 / - +")
-                    return dbd
-                return src
-        return core.std.FrameEval(src, partial(calculate, src=src))
+    a, ab, bc, c = src[0] + src[:-1], src, src[1:] + src[-1], src[2:] + src[-2:]
+    dbd = core.std.Expr([a, ab, bc, c], "z a 2 / - y x 2 / - +")
+    select_src = [src.std.SelectEvery(5, i) for i in range(5)]
+    select_dbd = [dbd.std.SelectEvery(5, i) for i in range(5)]
+    inter0 = core.std.Interleave([select_dbd[0], select_src[1], select_src[2], select_src[3], select_src[4]])
+    inter1 = core.std.Interleave([select_src[0], select_dbd[1], select_src[2], select_src[3], select_src[4]])
+    inter2 = core.std.Interleave([select_src[0], select_src[1], select_dbd[2], select_src[3], select_src[4]])
+    inter3 = core.std.Interleave([select_src[0], select_src[1], select_src[2], select_dbd[3], select_src[4]])
+    inter4 = core.std.Interleave([select_src[0], select_src[1], select_src[2], select_src[3], select_dbd[4]])
 
     def calculate(n, f, src):
         avg = [f[i].props['PlaneStatsAverage'] for i in range(1, 7)]
@@ -185,8 +182,7 @@ def jdeblend(src_fm, src, vinverse=True):
             out = out.vinverse.Vinverse() if vinverse else out
         return out[n+1] if sum(comb) == 2 else out
        
-    db_list = [deblend(src), src[:1]+deblend(src[1:]), src[:2]+deblend(src[2:]), src[:3]+deblend(src[3:]), src[:4]+deblend(src[4:])]
-    clist = [src_fm, db_list[0], db_list[1], db_list[2], db_list[3], db_list[4], src, src_fm[0]+src_fm[:-1]]
+    clist = [src_fm, inter0, inter1, inter2, inter3, inter4, src, src_fm[0]+src_fm[:-1]]
     return core.std.FrameEval(src_fm, partial(calculate, src=clist[:6]), [core.std.PlaneStats(i) for i in clist])
 
 def jdeblend_kf(src, src_fm):
