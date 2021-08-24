@@ -190,7 +190,7 @@ def jdeblend(src_fm, src, vinverse=True):
     clist = [src_fm, inter0, inter1, inter2, inter3, inter4, src, src_fm[0]+src_fm[:-1]]
     out = core.std.FrameEval(src_fm, partial(calculate, src=clist[:6]), [core.std.PlaneStats(i) for i in clist])
     if vinverse:
-        out = core.std.FrameEval(out, partial(vinv_combed_func, original=out, vinversed=core.vinverse.Vinverse(out)))
+        out = core.std.FrameEval(out, partial(vinv_combed_func, original=out, vinversed=core.vinverse.Vinverse(out)), src_fm)
     
     return out
 
