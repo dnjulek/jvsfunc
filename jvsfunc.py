@@ -196,7 +196,7 @@ def jdeblend_kf(src, src_fm):
 
     def keyframe(n, f, src):
         keyfm = [f[i].props['VFMSceneChange'] for i in [0, 1]]
-        kf_end = sum(keyfm) == 1
+        kf_end = keyfm[0] > keyfm[1]
         kf_start = sum(keyfm) == 2
         is_cmb = f[0].props['_Combed'] == 1
         src = src[n-1] if kf_end and is_cmb else src
