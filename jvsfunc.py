@@ -179,11 +179,20 @@ def jdeblend(src_fm, src, vinverse=True):
         src, out = src[1:], src[0]
         if comb[0] == 1:
             out = src[avg.index([i for i in avg if i != ref][0])]
-            out = out.vinverse.Vinverse() if vinverse else out
         return out[n+1] if sum(comb) == 2 else out
+
+    def vinv_combed_func(n, f, original, vinversed):
+        if f.props['_Combed']:
+            return vinversed
+        else:
+            return original
        
     clist = [src_fm, inter0, inter1, inter2, inter3, inter4, src, src_fm[0]+src_fm[:-1]]
-    return core.std.FrameEval(src_fm, partial(calculate, src=clist[:6]), [core.std.PlaneStats(i) for i in clist])
+    out = core.std.FrameEval(src_fm, partial(calculate, src=clist[:6]), [core.std.PlaneStats(i) for i in clist])
+    if vinverse:
+        out = core.std.FrameEval(out, partial(vinv_combed_func, original=out, vinversed=core.vinverse.Vinverse(out)), src_fm)
+    
+    return out
 
 def jdeblend_kf(src, src_fm):
     """
