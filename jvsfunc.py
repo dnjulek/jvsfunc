@@ -172,27 +172,58 @@ def jdeblend(src_fm, src, vinverse=True):
     inter3 = core.std.Interleave([select_src[0], select_src[1], select_src[2], select_dbd[3], select_src[4]])
     inter4 = core.std.Interleave([select_src[0], select_src[1], select_src[2], select_src[3], select_dbd[4]])
 
-    def calculate(n, f, src):
-        avg = [f[i].props['PlaneStatsAverage'] for i in range(1, 7)]
-        comb = [f[i].props['_Combed'] for i in [0, 7]]
-        avg, ref = avg[:5], avg[5]
-        src, out = src[1:], src[0]
+    def calculate(n, f, src, inters):
+        comb = [f[i].props['_Combed'] for i in [0, 1]]
+        pattern = n % 5
         if comb[0] == 1:
-            out = src[avg.index([i for i in avg if i != ref][0])]
-        return out[n+1] if sum(comb) == 2 else out
-
-    def vinv_combed_func(n, f, original, vinversed):
-        if f.props['_Combed']:
-            return vinversed
-        else:
-            return original
+            src = inters[pattern]
+        return src[n+1] if sum(comb) == 2 else src
        
-    clist = [src_fm, inter0, inter1, inter2, inter3, inter4, src, src_fm[0]+src_fm[:-1]]
-    out = core.std.FrameEval(src_fm, partial(calculate, src=clist[:6]), [core.std.PlaneStats(i) for i in clist])
-    if vinverse:
-        out = core.std.FrameEval(out, partial(vinv_combed_func, original=out, vinversed=core.vinverse.Vinverse(out)), src_fm)
-    
-    return out
+    inters = [inter0, inter1, inter2, inter3, inter4]
+    inters = [core.vinverse.Vinverse(i) for i in inters] if vinverse else inters
+    return core.std.FrameEval(src_fm, partial(calculate, src=src_fm, inters=inters), [src_fm, src_fm[0]+src_fm[:-1]])
+
+def jdeblend_bob(src_fm, bobbed):
+    """
+    Stronger version of jdeblend() that uses a bobbed clip to deblend.
+
+    Parameters:
+    clip   src_fm:              Source after field matching, must have field=3 and low cthresh.
+    clip   src:                 Bobbed source.
+
+    Example:
+    src = 
+    from havsfunc import QTGMC
+    qtg = QTGMC(src, TFF=True, SourceMatch=3)
+    vfm = src.vivtc.VFM(order=1, field=3, cthresh=3)
+    dblend = jdeblend_bob(vfm, qtg)
+    dblend = jdeblend_kf(dblend, vfm)
+    """
+
+    bob0 = bobbed.std.SelectEvery(2, 0)
+    bob1 = bobbed.std.SelectEvery(2, 1)
+    ab0, bc0, c0 = bob0, bob0[1:] + bob0[-1], bob0[2:] + bob0[-2]
+    a1, ab1, bc1 = bob1[0] + bob1[:-1], bob1, bob1[1:] + bob1[-1]
+    dbd = core.std.Expr([a1, ab1, ab0, bc1, bc0, c0], 'y x - z + b c - a + + 2 /')
+    dbd = core.std.ShufflePlanes([bc0, dbd], [0, 1, 2], vs.YUV)
+
+    select_src = [src_fm.std.SelectEvery(5, i) for i in range(5)]
+    select_dbd = [dbd.std.SelectEvery(5, i) for i in range(5)]
+    inter0 = core.std.Interleave([select_dbd[0], select_src[1], select_src[2], select_src[3], select_src[4]])
+    inter1 = core.std.Interleave([select_src[0], select_dbd[1], select_src[2], select_src[3], select_src[4]])
+    inter2 = core.std.Interleave([select_src[0], select_src[1], select_dbd[2], select_src[3], select_src[4]])
+    inter3 = core.std.Interleave([select_src[0], select_src[1], select_src[2], select_dbd[3], select_src[4]])
+    inter4 = core.std.Interleave([select_src[0], select_src[1], select_src[2], select_src[3], select_dbd[4]])
+
+    def calculate(n, f, src, inters):
+        comb = [f[i].props['_Combed'] for i in [0, 1]]
+        pattern = n % 5
+        if comb[0] == 1:
+            src = inters[pattern]
+        return src[n+1] if sum(comb) == 2 else src
+       
+    inters = [inter0, inter1, inter2, inter3, inter4]
+    return core.std.FrameEval(src_fm, partial(calculate, src=src_fm, inters=inters), [src_fm, src_fm[0]+src_fm[:-1]])
 
 def jdeblend_kf(src, src_fm):
     """
