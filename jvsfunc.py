@@ -31,8 +31,8 @@ def expr_open(src, size = 2):
     """
     Same result as core.morpho.Open(), faster and workable in 32 bit.
     """
-    close = expr_erode(src, size)
-    return expr_dilate(close, size)
+    open = expr_erode(src, size)
+    return expr_dilate(open, size)
 
 def dehalo_mask(src, expand=0.5, iterations=2, brz=255):
     """
