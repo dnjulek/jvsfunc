@@ -10,14 +10,14 @@ def expr_dilate(src, size = 5):
     """
     Same result as core.morpho.Dilate(), faster and workable in 32 bit.
     """
-    expr = _expr_matrix(size, mm = 'max')
+    expr = _morpho_matrix(size, mm = 'max')
     return core.akarin.Expr(src, expr)
 
 def expr_erode(src, size = 5):
     """
     Same result as core.morpho.Erode(), faster and workable in 32 bit.
     """
-    expr = _expr_matrix(size, mm = 'min')
+    expr = _morpho_matrix(size, mm = 'min')
     return core.akarin.Expr(src, expr)
 
 def expr_close(src, size = 5):
@@ -33,6 +33,19 @@ def expr_open(src, size = 5):
     """
     open = expr_erode(src, size)
     return expr_dilate(open, size)
+
+def medianblur(src, radius = 2):
+    """
+    A spatial median blur filter with a variable radius.
+    """
+    rb = radius * 2 + 1
+    rb = rb * rb
+    st = rb - 1
+    sp = rb//2 - 1
+    dp = st - 2
+    expr = f'sort{st} swap{sp} min! swap{sp} max! drop{dp} x min@ max@ clamp'
+    expr = _ex_matrix(radius) + expr
+    return src.akarin.Expr(expr)
 
 def dehalo_mask(src, expand=0.5, iterations=2, brz=255):
     """
@@ -335,18 +348,20 @@ def _rng(flist1, min_length):
     final[1::2] = last_frame
     return final
 
-def _expr_matrix(size = 2, mm = 'max'):
+def _ex_matrix(r = 1):
+    r = [i for i in range(-1*r, r+1)]
+    matrix = [f'x[{x},{y}] ' for x in r for y in r]
+    matrix.pop(len(matrix)//2)
+    return ''.join(matrix)
 
+def _morpho_matrix(size = 2, mm = 'max'):
     is_even = size % 2 == 0
     rd = size // 2
-    r1 = [i for i in range(rd + 1)]
-    r2 = [i * -1 for i in r1[1:]]
-    r2.reverse()
-    r3 = r2 + r1
+    mt = [i for i in range(-1*rd, rd+1)]
 
-    odd = [f'x[{x},{y}] {mm} ' for x in r3 for y in r3]
-    even1 = [f'x[{x},{y}] {mm} ' for x in r3[:-1] for y in r3[:-1]]
-    even2 = [f'x[{x},{y}] {mm} ' for x in r3[-1:] for y in r3[:-2]]
+    odd = [f'x[{x},{y}] {mm} ' for x in mt for y in mt]
+    even1 = [f'x[{x},{y}] {mm} ' for x in mt[:-1] for y in mt[:-1]]
+    even2 = [f'x[{x},{y}] {mm} ' for x in mt[-1:] for y in mt[:-2]]
     matrix = even1 + even2 if is_even else odd
     matrix = ''.join(matrix)
     return matrix[:8] + matrix[12:]
