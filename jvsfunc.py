@@ -47,6 +47,24 @@ def medianblur(src, radius = 2):
     expr = _ex_matrix(radius) + expr
     return src.akarin.Expr(expr)
 
+def repair(src, ref, mode = 1):
+    """
+    Same speed as rgvs and faster than rgsf.
+    """
+    mode_list = [1, 2, 3, 4, 11, 12, 13, 14]
+    if mode not in mode_list:
+        raise ValueError('repair: Only modes 1-4 and 11-14 are implemented.')
+    
+    pixels = 'y[-1,-1] y[0,-1] y[1,-1] y[-1,0] y[1,0] y[-1,1] y[0,1] y[1,1] '
+
+    if mode <= 4:
+        expr = f'y sort9 dup{9 - mode} max! dup{mode - 1} min! drop9 x min@ max@ clamp'
+    else:
+        mode = mode - 10
+        expr = f'sort8 dup{8 - mode} max! dup{mode - 1} min! drop8 y min@ min ymin! y max@ max ymax! x ymin@ ymax@ clamp'
+
+    return core.akarin.Expr([src, ref], pixels + expr)
+
 def dehalo_mask(src, expand=0.5, iterations=2, brz=255):
     """
     Based on muvsfunc.YAHRmask(), stand-alone version with some tweaks.
