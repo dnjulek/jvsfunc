@@ -9,3 +9,7 @@ Julek’s VapourSynth functions. Very simple functions, don't expect too much, I
 * [VapourSynth-scxvid](https://github.com/dubhater/vapoursynth-scxvid)
 * [VapourSynth-TCanny](https://github.com/HomeOfVapourSynthEvolution/VapourSynth-TCanny)
 * [VapourSynth-TDeintMod](https://github.com/HomeOfVapourSynthEvolution/VapourSynth-TDeintMod)
+
+# Install
+1. install [Git](https://git-scm.com/downloads)
+2. in CMD/PowerShell run: `pip install git+https://github.com/dnjulek/jvsfunc.git`
