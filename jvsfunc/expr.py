@@ -3,6 +3,7 @@ Some functions implemented with core.akarin.Expr
 """
 
 from .util import morpho_matrix, ex_matrix
+from vsutil import plane, depth, get_depth
 import vapoursynth as vs
 core = vs.core
 
@@ -13,7 +14,7 @@ def ccd(src: vs.VideoNode, threshold: float = 4) -> vs.VideoNode:
     """
 
     if src.format.color_family != vs.RGB or src.format.sample_type != vs.FLOAT:
-        raise ValueError('ccd: only RGBS format is supported')
+        raise ValueError('ccd: only RGBS format is supported, use jvsfunc.ccdmod() for YUV.')
 
     thr = threshold**2/195075.0
     r = core.std.ShufflePlanes([src, src, src], [0, 0, 0], vs.RGB)
@@ -53,6 +54,64 @@ def ccd(src: vs.VideoNode, threshold: float = 4) -> vs.VideoNode:
                               '+ + + + + + + + + + + + + + + a + Q@ /')
 
     return ex_ccd
+
+
+def ccdmod(src: vs.VideoNode, threshold: float = 4, matrix: int | None = None) -> vs.VideoNode:
+    """
+    A faster implementation that processes only chroma.
+    """
+
+    if src.format.color_family != vs.YUV:
+        raise ValueError('ccdmod: only YUV format is supported, use jvsfunc.ccd() for RGB.')
+
+    if matrix is None:
+        matrix = 1 if src.width > 1270 or src.height > 710 else 6
+
+    thr = threshold**2/195075.0
+    u = plane(src, 1)
+
+    yuv = src.resize.Bicubic(u.width, u.height, format=vs.YUV444P16)
+    rgbs = yuv.resize.Point(format=vs.RGBS, matrix_in=matrix)
+
+    rrr = core.std.ShufflePlanes([rgbs, rgbs, rgbs], [0, 0, 0], vs.RGB)
+    ggg = core.std.ShufflePlanes([rgbs, rgbs, rgbs], [1, 1, 1], vs.RGB)
+    bbb = core.std.ShufflePlanes([rgbs, rgbs, rgbs], [2, 2, 2], vs.RGB)
+
+    ex_ccd = core.akarin.Expr([yuv, rrr, ggg, bbb],
+                              ['',
+                               'y[-12,-12] y - 2 pow z[-12,-12] z - 2 pow a[-12,-12] a - 2 pow + + A! '
+                               'y[-4,-12] y - 2 pow z[-4,-12] z - 2 pow a[-4,-12] a - 2 pow + + B! '
+                               'y[4,-12] y - 2 pow z[4,-12] z - 2 pow a[4,-12] a - 2 pow + + C! '
+                               'y[12,-12] y - 2 pow z[12,-12] z - 2 pow a[12,-12] a - 2 pow + + D! '
+                               'y[-12,-4] y - 2 pow z[-12,-4] z - 2 pow a[-12,-4] a - 2 pow + + E! '
+                               'y[-4,-4] y - 2 pow z[-4,-4] z - 2 pow a[-4,-4] a - 2 pow + + F! '
+                               'y[4,-4] y - 2 pow z[4,-4] z - 2 pow a[4,-4] a - 2 pow + + G! '
+                               'y[12,-4] y - 2 pow z[12,-4] z - 2 pow a[12,-4] a - 2 pow + + H! '
+                               'y[-12,4] y - 2 pow z[-12,4] z - 2 pow a[-12,4] a - 2 pow + + I! '
+                               'y[-4,4] y - 2 pow z[-4,4] z - 2 pow a[-4,4] a - 2 pow + + J! '
+                               'y[4,4] y - 2 pow z[4,4] z - 2 pow a[4,4] a - 2 pow + + K! '
+                               'y[12,4] y - 2 pow z[12,4] z - 2 pow a[12,4] a - 2 pow + + L! '
+                               'y[-12,12] y - 2 pow z[-12,12] z - 2 pow a[-12,12] a - 2 pow + + M! '
+                               'y[-4,12] y - 2 pow z[-4,12] z - 2 pow a[-4,12] a - 2 pow + + N! '
+                               'y[4,12] y - 2 pow z[4,12] z - 2 pow a[4,12] a - 2 pow + + O! '
+                               'y[12,12] y - 2 pow z[12,12] z - 2 pow a[12,12] a - 2 pow + + P! '
+                               f'A@ {thr} < 1 0 ? B@ {thr} < 1 0 ? C@ {thr} < 1 0 ? D@ {thr} < 1 0 ? '
+                               f'E@ {thr} < 1 0 ? F@ {thr} < 1 0 ? G@ {thr} < 1 0 ? H@ {thr} < 1 0 ? '
+                               f'I@ {thr} < 1 0 ? J@ {thr} < 1 0 ? K@ {thr} < 1 0 ? L@ {thr} < 1 0 ? '
+                               f'M@ {thr} < 1 0 ? N@ {thr} < 1 0 ? O@ {thr} < 1 0 ? P@ {thr} < 1 0 ? '
+                               '+ + + + + + + + + + + + + + + 1 + Q! '
+                               f'A@ {thr} < x[-12,-12] 0 ? B@ {thr} < x[-4,-12] 0 ? '
+                               f'C@ {thr} < x[4,-12] 0 ? D@ {thr} < x[12,-12] 0 ? '
+                               f'E@ {thr} < x[-12,-4] 0 ? F@ {thr} < x[-4,-4] 0 ? '
+                               f'G@ {thr} < x[4,-4] 0 ? H@ {thr} < x[12,-4] 0 ? '
+                               f'I@ {thr} < x[-12,4] 0 ? J@ {thr} < x[-4,4] 0 ? '
+                               f'K@ {thr} < x[4,4] 0 ? L@ {thr} < x[12,4] 0 ? '
+                               f'M@ {thr} < x[-12,12] 0 ? N@ {thr} < x[-4,12] 0 ? '
+                               f'O@ {thr} < x[4,12] 0 ? P@ {thr} < x[12,12] 0 ? '
+                               '+ + + + + + + + + + + + + + + x + Q@ /'])
+
+    ex_ccd = depth(ex_ccd, get_depth(src))
+    return core.std.ShufflePlanes([src, ex_ccd], [0, 1, 2], vs.YUV)
 
 
 def medianblur(src: vs.VideoNode, radius: int = 2) -> vs.VideoNode:
