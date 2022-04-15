@@ -110,6 +110,7 @@ def ccdmod(src: vs.VideoNode, threshold: float = 4, matrix: int | None = None) -
                                f'O@ {thr} < x[4,12] 0 ? P@ {thr} < x[12,12] 0 ? '
                                '+ + + + + + + + + + + + + + + x + Q@ /'])
 
+    ex_ccd = ex_ccd.resize.Bicubic(src_left=-0.25)
     ex_ccd = depth(ex_ccd, get_depth(src))
     return core.std.ShufflePlanes([src, ex_ccd], [0, 1, 2], vs.YUV)
 
