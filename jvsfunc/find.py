@@ -5,7 +5,6 @@ Some functions implemented with core.akarin.Expr
 from lvsfunc.render import clip_async_render
 from .util import bookmarks, rng
 from vsutil import depth
-from typing import Type
 import operator as opr
 import vapoursynth as vs
 core = vs.core
