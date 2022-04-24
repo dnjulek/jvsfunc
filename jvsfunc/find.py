@@ -1,11 +1,12 @@
 """
-Some functions implemented with core.akarin.Expr
+Some functions to generate VSEdit Bookmarks file with a list of frames, to be used in scene filtering.
 """
 
 from lvsfunc.render import clip_async_render
 from .util import bookmarks, rng
 from vsutil import depth
 import operator as opr
+from typing import Any
 import vapoursynth as vs
 core = vs.core
 
@@ -55,15 +56,16 @@ def find_prop(src: vs.VideoNode,
     return src
 
 
-def find_comb(src: vs.VideoNode, name: str = 'comb_list') -> vs.VideoNode:
+def find_comb(src: vs.VideoNode, name: str = 'comb_list', **kwargs: Any) -> vs.VideoNode:
     """
     Creates a VSEdit Bookmarks file with a list of combed frames, to be used in scene filtering.
 
     :param src: Input clip.
     :param name: Output file name.
+    :param kwargs: Arguments passed to tdm.IsCombed.
     """
     src = depth(src, 8)
-    find = core.tdm.IsCombed(src)
+    find = core.tdm.IsCombed(src, **kwargs)
     return find_prop(find, prop="_Combed", operator="==", ref=1, name=name)
 
 
