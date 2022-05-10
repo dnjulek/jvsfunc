@@ -2,7 +2,7 @@
 Some functions implemented with core.akarin.Expr
 """
 
-from vsutil import plane, depth, get_depth, split, join
+from vsutil import plane, depth, get_depth, split, join, scale_value, get_neutral_value
 from .util import morpho_matrix, ex_matrix
 from lvsfunc.scale import ssim_downsample
 from lvsfunc.util import get_prop
@@ -188,6 +188,47 @@ def ccdmod(src: vs.VideoNode, threshold: float = 4, matrix: int | None = None) -
     ex_ccd = ex_ccd.resize.Bicubic(src_left=-0.25)
     ex_ccd = depth(ex_ccd, get_depth(src))
     return core.std.ShufflePlanes([src, ex_ccd], [0, 1, 2], vs.YUV)
+
+
+def vinverse(src: vs.VideoNode, sstr: float = 2.7, amnt: int = 255, chroma: bool = True, scl: float = 0.25):
+    """
+    A simple filter to remove residual combing, based on an AviSynth script by Didée.
+
+    :param src: Input clip.
+    :param sstr: strength of contra sharpening
+    :param amnt: change no pixel by more than this (default=255: unrestricted)
+    :param chroma: chroma mode, True=process chroma, False=pass chroma through
+    :param scl: scale factor for vshrpD*vblurD < 0
+    """
+
+    neutral = get_neutral_value(src)
+    exp = [f'x y - {neutral} + vbd! '  # vblurD
+           f'y y z - {sstr} * + round '  # vshrp
+           f'y - {neutral} + vsd! '  # vshrpD
+           f'vsd@ {neutral} - vbd@ {neutral} - * 0 < vsd@ {neutral} - abs '  # vlimD
+           f'vbd@ {neutral} - abs < vsd@ vbd@ ? {neutral} - {scl} * {neutral} + '  # vlimD
+           f'vsd@ {neutral} - abs vbd@ {neutral} - abs < vsd@ vbd@ ? ? round '  # vlimD
+           f'y {neutral} - +', '']  # last
+
+    if src.format.sample_type == vs.FLOAT:
+        exp = [i.replace('round ', '') for i in exp]
+
+    planes = [0]
+
+    if chroma:
+        planes = [0, 1, 2]
+        exp = exp[0]
+
+    vblur = src.std.Convolution(matrix=[50, 99, 50], mode='v', planes=planes)
+    vblur2 = vblur.std.Convolution(matrix=[1, 4, 6, 4, 1], mode='v', planes=planes)
+    vnv = core.akarin.Expr([src, vblur, vblur2], exp)
+
+    if amnt <= 0:
+        return src
+    elif amnt < 255:
+        AMN = scale_value(amnt, 8, get_depth(src))
+        vnv = core.akarin.Expr([src, vnv], f'x {AMN} + y < x {AMN} + x {AMN} - y > x {AMN} - y ? ?')
+    return vnv
 
 
 def medianblur(src: vs.VideoNode, radius: int = 2) -> vs.VideoNode:
