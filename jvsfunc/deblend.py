@@ -5,6 +5,7 @@ Deblend functions
 from functools import partial
 from typing import List
 from .util import inter_pattern, jdeblend_eval
+from .expr import vinverse as ex_vinverse
 import vapoursynth as vs
 core = vs.core
 
@@ -27,7 +28,7 @@ def jdeblend(src_fm: vs.VideoNode, src: vs.VideoNode, vinverse: bool = True) -> 
 
     a, ab, bc, c = src[0] + src[:-1], src, src[1:] + src[-1], src[2:] + src[-2:]
     dbd = core.std.Expr([a, ab, bc, c], "z a 2 / - y x 2 / - +")
-    dbd = dbd.vinverse.Vinverse() if vinverse else dbd
+    dbd = ex_vinverse(dbd) if vinverse else dbd
 
     select_src = [src.std.SelectEvery(5, i) for i in range(5)]
     select_dbd = [dbd.std.SelectEvery(5, i) for i in range(5)]
@@ -112,7 +113,7 @@ def JIVTC_Deblend(src: vs.VideoNode, pattern: int, chroma_only: bool = True, tff
 
     a, ab, bc, c = src[0] + src[:-1], src, src[1:] + src[-1], src[2:] + src[-2:]
     deblended = core.std.Expr([a, ab, bc, c], "z a 2 / - y x 2 / - +")
-    deblended = deblended.vinverse.Vinverse()
+    deblended = ex_vinverse(deblended)
     deblended = core.std.SelectEvery(deblended, 5, cycle05[pattern])
 
     inter = core.std.Interleave([ivtced, deblended])
