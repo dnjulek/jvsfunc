@@ -14,6 +14,8 @@ core = vs.core
 def ccd(src: vs.VideoNode,
         threshold: float = 4,
         mode: int = 1,
+        scale: float | int = 1,
+        debug: bool = False,
         matrix: int | None = None,
         **kwargs: Any) -> vs.VideoNode:
     """
@@ -26,6 +28,11 @@ def ccd(src: vs.VideoNode,
                  mode=2: bicubic to luma resolution, and then back to YUV with bicubic.
                  mode=3: nnedi3 to luma resolution, and then back to YUV with bicubic.
                  mode=4: nnedi3 to luma resolution, and then back to YUV with ssim_downsample.
+    :param scale: Scale the matrix size for convolution, scale=1 enables the automatic resize and scale=0 disables it.
+                  You can also use custom values like scale=1.5 for a matrix 50% bigger than the original.
+                  The original matrix size is 25x25 for a 320x240 chroma.
+                  The processed chroma size depends on the mode, so enable debug before using a custom value.
+    :param debug: Shows the scale used (including automatic one from scale=1) and the matrix size.
     :param matrix: YUV matrix coefficient. If None, 1 will be used for HD and 6 for SD.
     :param kwargs: Arguments passed to ssim_downsample.
     """
@@ -57,42 +64,55 @@ def ccd(src: vs.VideoNode,
             matrix = guess
         return guess if matrix == 2 else matrix
 
-    def expr(src: vs.VideoNode) -> vs.VideoNode:
+    def expr(src: vs.VideoNode, scale) -> vs.VideoNode:
         r = core.std.ShufflePlanes([src, src, src], [0, 0, 0], vs.RGB)
         g = core.std.ShufflePlanes([src, src, src], [1, 1, 1], vs.RGB)
         b = core.std.ShufflePlanes([src, src, src], [2, 2, 2], vs.RGB)
 
+        if scale <= 0:
+            x, y = 4, 12
+        elif scale == 1:
+            scale = src.height/240
+            x = round(scale*4)
+            y = round(scale*12)
+        else:
+            x = round(scale*4)
+            y = round(scale*12)
+
         ex_ccd = core.akarin.Expr([r, g, b, src],
-                                  'x[-12,-12] x - 2 pow y[-12,-12] y - 2 pow z[-12,-12] z - 2 pow + + A! '
-                                  'x[-4,-12] x - 2 pow y[-4,-12] y - 2 pow z[-4,-12] z - 2 pow + + B! '
-                                  'x[4,-12] x - 2 pow y[4,-12] y - 2 pow z[4,-12] z - 2 pow + + C! '
-                                  'x[12,-12] x - 2 pow y[12,-12] y - 2 pow z[12,-12] z - 2 pow + + D! '
-                                  'x[-12,-4] x - 2 pow y[-12,-4] y - 2 pow z[-12,-4] z - 2 pow + + E! '
-                                  'x[-4,-4] x - 2 pow y[-4,-4] y - 2 pow z[-4,-4] z - 2 pow + + F! '
-                                  'x[4,-4] x - 2 pow y[4,-4] y - 2 pow z[4,-4] z - 2 pow + + G! '
-                                  'x[12,-4] x - 2 pow y[12,-4] y - 2 pow z[12,-4] z - 2 pow + + H! '
-                                  'x[-12,4] x - 2 pow y[-12,4] y - 2 pow z[-12,4] z - 2 pow + + I! '
-                                  'x[-4,4] x - 2 pow y[-4,4] y - 2 pow z[-4,4] z - 2 pow + + J! '
-                                  'x[4,4] x - 2 pow y[4,4] y - 2 pow z[4,4] z - 2 pow + + K! '
-                                  'x[12,4] x - 2 pow y[12,4] y - 2 pow z[12,4] z - 2 pow + + L! '
-                                  'x[-12,12] x - 2 pow y[-12,12] y - 2 pow z[-12,12] z - 2 pow + + M! '
-                                  'x[-4,12] x - 2 pow y[-4,12] y - 2 pow z[-4,12] z - 2 pow + + N! '
-                                  'x[4,12] x - 2 pow y[4,12] y - 2 pow z[4,12] z - 2 pow + + O! '
-                                  'x[12,12] x - 2 pow y[12,12] y - 2 pow z[12,12] z - 2 pow + + P! '
+                                  f'x[-{y},-{y}] x - 2 pow y[-{y},-{y}] y - 2 pow z[-{y},-{y}] z - 2 pow + + A! '
+                                  f'x[-{x},-{y}] x - 2 pow y[-{x},-{y}] y - 2 pow z[-{x},-{y}] z - 2 pow + + B! '
+                                  f'x[{x},-{y}] x - 2 pow y[{x},-{y}] y - 2 pow z[{x},-{y}] z - 2 pow + + C! '
+                                  f'x[{y},-{y}] x - 2 pow y[{y},-{y}] y - 2 pow z[{y},-{y}] z - 2 pow + + D! '
+                                  f'x[-{y},-{x}] x - 2 pow y[-{y},-{x}] y - 2 pow z[-{y},-{x}] z - 2 pow + + E! '
+                                  f'x[-{x},-{x}] x - 2 pow y[-{x},-{x}] y - 2 pow z[-{x},-{x}] z - 2 pow + + F! '
+                                  f'x[{x},-{x}] x - 2 pow y[{x},-{x}] y - 2 pow z[{x},-{x}] z - 2 pow + + G! '
+                                  f'x[{y},-{x}] x - 2 pow y[{y},-{x}] y - 2 pow z[{y},-{x}] z - 2 pow + + H! '
+                                  f'x[-{y},{x}] x - 2 pow y[-{y},{x}] y - 2 pow z[-{y},{x}] z - 2 pow + + I! '
+                                  f'x[-{x},{x}] x - 2 pow y[-{x},{x}] y - 2 pow z[-{x},{x}] z - 2 pow + + J! '
+                                  f'x[{x},{x}] x - 2 pow y[{x},{x}] y - 2 pow z[{x},{x}] z - 2 pow + + K! '
+                                  f'x[{y},{x}] x - 2 pow y[{y},{x}] y - 2 pow z[{y},{x}] z - 2 pow + + L! '
+                                  f'x[-{y},{y}] x - 2 pow y[-{y},{y}] y - 2 pow z[-{y},{y}] z - 2 pow + + M! '
+                                  f'x[-{x},{y}] x - 2 pow y[-{x},{y}] y - 2 pow z[-{x},{y}] z - 2 pow + + N! '
+                                  f'x[{x},{y}] x - 2 pow y[{x},{y}] y - 2 pow z[{x},{y}] z - 2 pow + + O! '
+                                  f'x[{y},{y}] x - 2 pow y[{y},{y}] y - 2 pow z[{y},{y}] z - 2 pow + + P! '
                                   f'A@ {thr} < 1 0 ? B@ {thr} < 1 0 ? C@ {thr} < 1 0 ? D@ {thr} < 1 0 ? '
                                   f'E@ {thr} < 1 0 ? F@ {thr} < 1 0 ? G@ {thr} < 1 0 ? H@ {thr} < 1 0 ? '
                                   f'I@ {thr} < 1 0 ? J@ {thr} < 1 0 ? K@ {thr} < 1 0 ? L@ {thr} < 1 0 ? '
                                   f'M@ {thr} < 1 0 ? N@ {thr} < 1 0 ? O@ {thr} < 1 0 ? P@ {thr} < 1 0 ? '
                                   '+ + + + + + + + + + + + + + + 1 + Q! '
-                                  f'A@ {thr} < a[-12,-12] 0 ? B@ {thr} < a[-4,-12] 0 ? '
-                                  f'C@ {thr} < a[4,-12] 0 ? D@ {thr} < a[12,-12] 0 ? '
-                                  f'E@ {thr} < a[-12,-4] 0 ? F@ {thr} < a[-4,-4] 0 ? '
-                                  f'G@ {thr} < a[4,-4] 0 ? H@ {thr} < a[12,-4] 0 ? '
-                                  f'I@ {thr} < a[-12,4] 0 ? J@ {thr} < a[-4,4] 0 ? '
-                                  f'K@ {thr} < a[4,4] 0 ? L@ {thr} < a[12,4] 0 ? '
-                                  f'M@ {thr} < a[-12,12] 0 ? N@ {thr} < a[-4,12] 0 ? '
-                                  f'O@ {thr} < a[4,12] 0 ? P@ {thr} < a[12,12] 0 ? '
+                                  f'A@ {thr} < a[-{y},-{y}] 0 ? B@ {thr} < a[-{x},-{y}] 0 ? '
+                                  f'C@ {thr} < a[{x},-{y}] 0 ? D@ {thr} < a[{y},-{y}] 0 ? '
+                                  f'E@ {thr} < a[-{y},-{x}] 0 ? F@ {thr} < a[-{x},-{x}] 0 ? '
+                                  f'G@ {thr} < a[{x},-{x}] 0 ? H@ {thr} < a[{y},-{x}] 0 ? '
+                                  f'I@ {thr} < a[-{y},{x}] 0 ? J@ {thr} < a[-{x},{x}] 0 ? '
+                                  f'K@ {thr} < a[{x},{x}] 0 ? L@ {thr} < a[{y},{x}] 0 ? '
+                                  f'M@ {thr} < a[-{y},{y}] 0 ? N@ {thr} < a[-{x},{y}] 0 ? '
+                                  f'O@ {thr} < a[{x},{y}] 0 ? P@ {thr} < a[{y},{y}] 0 ? '
                                   '+ + + + + + + + + + + + + + + a + Q@ /')
+        if debug:
+            msize = str((y*2) + 1)
+            return ex_ccd.text.Text("current scale: "+str(scale)+"\nmatrix size: "+msize+"x"+msize)
         return ex_ccd
 
     if src.format.color_family == vs.YUV:
@@ -107,27 +127,30 @@ def ccd(src: vs.VideoNode,
 
             if mode == 1:
                 rgbs = src.resize.Bicubic(cw, ch, format=vs.RGBS, matrix_in=matrix)
-                den = expr(rgbs).resize.Bicubic(format=src444, matrix=matrix, src_left=-0.25)
+                den = expr(rgbs, scale).resize.Bicubic(format=src444, matrix=matrix, src_left=-0.25)
             elif mode == 2:
                 rgbs = src.resize.Bicubic(format=vs.RGBS, matrix_in=matrix)
-                den = expr(rgbs).resize.Bicubic(format=src.format.id, matrix=matrix)
+                den = expr(rgbs, scale).resize.Bicubic(format=src.format.id, matrix=matrix)
             elif mode == 3:
                 rgbs = nnrgb(src, matrix)
-                den = expr(rgbs).resize.Bicubic(format=src.format.id, matrix=matrix)
+                den = expr(rgbs, scale).resize.Bicubic(format=src.format.id, matrix=matrix)
             else:
                 rgbs = nnrgb(src, matrix)
-                den = expr(rgbs).resize.Bicubic(format=vs.YUV444PS, matrix=matrix, src_left=-0.5)
+                den = expr(rgbs, scale).resize.Bicubic(format=vs.YUV444PS, matrix=matrix, src_left=-0.5)
                 u = ssim_downsample(plane(den, 1), cw, ch, **kwargs)
                 v = ssim_downsample(plane(den, 2), cw, ch, **kwargs)
                 den = core.std.ShufflePlanes([den, u, v], [0, 0, 0], vs.YUV)
                 den = den.resize.Point(format=src.format.id)
         else:
             rgbs = src.resize.Bicubic(format=vs.RGBS, matrix_in=matrix)
-            den = expr(rgbs).resize.Bicubic(format=src.format.id, matrix=matrix)
+            den = expr(rgbs, scale).resize.Bicubic(format=src.format.id, matrix=matrix)
         den = core.std.ShufflePlanes([src, den], [0, 1, 2], vs.YUV)
     else:
         rgbs = depth(src, 32)
-        den = expr(rgbs)
+        den = expr(rgbs, scale)
+
+    if debug:
+        return expr(rgbs, scale)
     return den
 
 
@@ -190,7 +213,11 @@ def ccdmod(src: vs.VideoNode, threshold: float = 4, matrix: int | None = None) -
     return core.std.ShufflePlanes([src, ex_ccd], [0, 1, 2], vs.YUV)
 
 
-def vinverse(src: vs.VideoNode, sstr: float = 2.7, amnt: int = 255, chroma: bool = True, scl: float = 0.25):
+def vinverse(src: vs.VideoNode,
+             sstr: float = 2.7,
+             amnt: int = 255,
+             chroma: bool = True,
+             scl: float = 0.25) -> vs.VideoNode:
     """
     A simple filter to remove residual combing, based on an AviSynth script by Didée.
 
