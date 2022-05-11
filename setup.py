@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='jvsfunc',
-    version='1.0.0',
+    version='1.0.1',
     description='Julek VapourSynth functions',
     url='https://github.com/dnjulek/jvsfunc',
     license='MIT',
