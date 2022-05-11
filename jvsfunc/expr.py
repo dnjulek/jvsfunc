@@ -31,7 +31,7 @@ def ccd(src: vs.VideoNode,
     :param scale: Scale the matrix size for convolution, scale=1 enables the automatic resize and scale=0 disables it.
                   You can also use custom values like scale=1.5 for a matrix 50% bigger than the original.
                   The original matrix size is 25x25 for a 320x240 chroma.
-                  The processed chroma size depends on the mode, so enable debug before using a custom value.
+                  Chroma size depends on the mode, so enable debug before using a custom value.
     :param debug: Shows the scale used (including automatic one from scale=1) and the matrix size.
     :param matrix: YUV matrix coefficient. If None, 1 will be used for HD and 6 for SD.
     :param kwargs: Arguments passed to ssim_downsample.
