@@ -14,7 +14,7 @@ core = vs.core
 def ccd(src: vs.VideoNode,
         threshold: float = 4,
         mode: int = 1,
-        scale: float | int = 1,
+        scale: float | int = 0,
         debug: bool = False,
         matrix: int | None = None,
         **kwargs: Any) -> vs.VideoNode:
