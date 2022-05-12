@@ -12,10 +12,10 @@ setup(
         'jvsfunc': ['py.typed'],
     },
     install_requires=[
-        'vapoursynth>=57',
+        'vapoursynth>=58',
         'lvsfunc',
         'vsutil',
     ],
     zip_safe=False,
-    python_requires='>=3.8',
+    python_requires='>=3.10',
 )
