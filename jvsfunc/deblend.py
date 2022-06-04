@@ -4,19 +4,19 @@ Deblend functions
 
 from functools import partial
 from typing import List
+from vsutil import get_neutral_value, scale_value, get_depth
 from .util import inter_pattern, jdeblend_eval
-from .expr import vinverse as ex_vinverse
 import vapoursynth as vs
 core = vs.core
 
 
-def jdeblend(src_fm: vs.VideoNode, src: vs.VideoNode, vinverse: bool = True) -> vs.VideoNode:
+def jdeblend(src_fm: vs.VideoNode, src: vs.VideoNode, vnv: bool = True) -> vs.VideoNode:
     """
     Automatically deblends if normal field matching leaves 2 blends every 5 frames (like avs's ExBlend).
 
     :param src_fm: Source after field matching, must have field=3 and low cthresh.
     :param src: Untouched source.
-    :param vinverse: Vinverse for post processing.
+    :param vnv: Enable vinverse for post processing.
 
     Example:
     src = clip
@@ -28,7 +28,7 @@ def jdeblend(src_fm: vs.VideoNode, src: vs.VideoNode, vinverse: bool = True) -> 
 
     a, ab, bc, c = src[0] + src[:-1], src, src[1:] + src[-1], src[2:] + src[-2:]
     dbd = core.std.Expr([a, ab, bc, c], "z a 2 / - y x 2 / - +")
-    dbd = ex_vinverse(dbd) if vinverse else dbd
+    dbd = vinverse(dbd) if vnv else dbd
 
     select_src = [src.std.SelectEvery(5, i) for i in range(5)]
     select_dbd = [dbd.std.SelectEvery(5, i) for i in range(5)]
@@ -113,7 +113,7 @@ def JIVTC_Deblend(src: vs.VideoNode, pattern: int, chroma_only: bool = True, tff
 
     a, ab, bc, c = src[0] + src[:-1], src, src[1:] + src[-1], src[2:] + src[-2:]
     deblended = core.std.Expr([a, ab, bc, c], "z a 2 / - y x 2 / - +")
-    deblended = ex_vinverse(deblended)
+    deblended = vinverse(deblended)
     deblended = core.std.SelectEvery(deblended, 5, cycle05[pattern])
 
     inter = core.std.Interleave([ivtced, deblended])
@@ -122,3 +122,48 @@ def JIVTC_Deblend(src: vs.VideoNode, pattern: int, chroma_only: bool = True, tff
     final_y = core.std.ShufflePlanes([ivtced, final], [0, 1, 2], vs.YUV)
     final = final_y if chroma_only else final
     return core.std.SetFrameProp(final, prop='_FieldBased', intval=0)
+
+
+def vinverse(src: vs.VideoNode,
+             sstr: float = 2.7,
+             amnt: int = 255,
+             chroma: bool = True,
+             scl: float = 0.25) -> vs.VideoNode:
+    """
+    A simple filter to remove residual combing, based on an AviSynth script by Didée.
+
+    :param src: Input clip.
+    :param sstr: strength of contra sharpening
+    :param amnt: change no pixel by more than this (default=255: unrestricted)
+    :param chroma: chroma mode, True=process chroma, False=pass chroma through
+    :param scl: scale factor for vshrpD*vblurD < 0
+    """
+
+    neutral = get_neutral_value(src)
+    exp = [f'x y - {neutral} + vbd! '  # vblurD
+           f'y y z - {sstr} * + round '  # vshrp
+           f'y - {neutral} + vsd! '  # vshrpD
+           f'vsd@ {neutral} - vbd@ {neutral} - * 0 < vsd@ {neutral} - abs '  # vlimD
+           f'vbd@ {neutral} - abs < vsd@ vbd@ ? {neutral} - {scl} * {neutral} + '  # vlimD
+           f'vsd@ {neutral} - abs vbd@ {neutral} - abs < vsd@ vbd@ ? ? round '  # vlimD
+           f'y {neutral} - +', '']  # last
+
+    if src.format.sample_type == vs.FLOAT:
+        exp = [i.replace('round ', '') for i in exp]
+
+    if chroma:
+        planes = [0, 1, 2]
+        exp = exp[0]
+    else:
+        planes = [0]
+
+    vblur = src.std.Convolution(matrix=[50, 99, 50], mode='v', planes=planes)
+    vblur2 = vblur.std.Convolution(matrix=[1, 4, 6, 4, 1], mode='v', planes=planes)
+    vnv = core.akarin.Expr([src, vblur, vblur2], exp)
+
+    if amnt <= 0:
+        return src
+    elif amnt < 255:
+        amn = scale_value(amnt, 8, get_depth(src))
+        vnv = core.akarin.Expr([src, vnv], f'x {amn} + y < x {amn} + x {amn} - y > x {amn} - y ? ?')
+    return vnv
