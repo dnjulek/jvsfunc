@@ -3,9 +3,10 @@ Deblend functions
 """
 
 from functools import partial
-from typing import List
+from typing import List, Sequence
 from vsutil import get_neutral_value, scale_value, get_depth
 from .util import inter_pattern, jdeblend_eval
+from .blur import sbr
 import vapoursynth as vs
 core = vs.core
 
@@ -127,43 +128,54 @@ def JIVTC_Deblend(src: vs.VideoNode, pattern: int, chroma_only: bool = True, tff
 def vinverse(src: vs.VideoNode,
              sstr: float = 2.7,
              amnt: int = 255,
-             chroma: bool = True,
-             scl: float = 0.25) -> vs.VideoNode:
+             scl: float = 0.25,
+             mode: str = 'v',
+             planes: int | Sequence[int] | None = None,
+             vinverse2: bool = False) -> vs.VideoNode:
     """
-    A simple filter to remove residual combing, based on an AviSynth script by Didée.
+    A simple filter to remove residual combing or dot crawl when vinverse2=True, based on an AviSynth script by Didée.
 
     :param src: Input clip.
-    :param sstr: strength of contra sharpening
-    :param amnt: change no pixel by more than this (default=255: unrestricted)
-    :param chroma: chroma mode, True=process chroma, False=pass chroma through
-    :param scl: scale factor for vshrpD*vblurD < 0
+    :param sstr: strength of contra sharpening.
+    :param amnt: change no pixel by more than this (default=255: unrestricted).
+    :param scl: scale factor for vshrpD*vblurD < 0.
+    :param mode: 'h', 'v' or 'hv', to apply the filter horizontally, vertically, or both.
+    :param planes: Planes to process.
+    :param vinverse2: Use Vinverse2 mode.
     """
 
-    neutral = get_neutral_value(src)
-    exp = [f'x y - {neutral} + vbd! '  # vblurD
-           f'y y z - {sstr} * + round '  # vshrp
-           f'y - {neutral} + vsd! '  # vshrpD
-           f'vsd@ {neutral} - vbd@ {neutral} - * 0 < vsd@ {neutral} - abs '  # vlimD
-           f'vbd@ {neutral} - abs < vsd@ vbd@ ? {neutral} - {scl} * {neutral} + '  # vlimD
-           f'vsd@ {neutral} - abs vbd@ {neutral} - abs < vsd@ vbd@ ? ? round '  # vlimD
-           f'y {neutral} - +', '']  # last
+    neutral = get_neutral_value(src, chroma=True)
+    plane_range = range(src.format.num_planes)
+
+    if planes is None:
+        planes = list(plane_range)
+    elif isinstance(planes, int):
+        planes = [planes]
+
+    expr = [f'x y - {neutral} + vbd! '  # vblurD
+            f'y y z - {sstr} * + round '  # vshrp
+            f'y - {neutral} + vsd! '  # vshrpD
+            f'vsd@ {neutral} - vbd@ {neutral} - * 0 < vsd@ {neutral} - abs '  # vlimD
+            f'vbd@ {neutral} - abs < vsd@ vbd@ ? {neutral} - {scl} * {neutral} + '  # vlimD
+            f'vsd@ {neutral} - abs vbd@ {neutral} - abs < vsd@ vbd@ ? ? round '  # vlimD
+            f'y {neutral} - +']  # last
 
     if src.format.sample_type == vs.FLOAT:
-        exp = [i.replace('round ', '') for i in exp]
+        expr = [i.replace('round ', '') for i in expr]
 
-    if chroma:
-        planes = [0, 1, 2]
-        exp = exp[0]
-    else:
-        planes = [0]
+    blur = src.std.Convolution([50, 99, 50], mode=mode, planes=planes)
+    blur2 = blur.std.Convolution([1, 4, 6, 4, 1], mode=mode, planes=planes)
 
-    vblur = src.std.Convolution(matrix=[50, 99, 50], mode='v', planes=planes)
-    vblur2 = vblur.std.Convolution(matrix=[1, 4, 6, 4, 1], mode='v', planes=planes)
-    vnv = core.akarin.Expr([src, vblur, vblur2], exp)
+    if vinverse2:
+        blur = sbr(src, mode=mode, planes=planes)
+        blur2 = blur.std.Convolution([1, 2, 1], mode=mode, planes=planes)
+
+    vnv = core.akarin.Expr([src, blur, blur2], [expr[0] if i in planes else '' for i in plane_range])
 
     if amnt <= 0:
         return src
     elif amnt < 255:
         amn = scale_value(amnt, 8, get_depth(src))
-        vnv = core.akarin.Expr([src, vnv], f'x {amn} + y < x {amn} + x {amn} - y > x {amn} - y ? ?')
+        expr = f'x {amn} + y < x {amn} + x {amn} - y > x {amn} - y ? ?'
+        vnv = core.akarin.Expr([src, vnv], [expr if i in planes else '' for i in plane_range])
     return vnv
