@@ -31,9 +31,9 @@ def ddcomb(src: vs.VideoNode, **frfun7over: Any) -> vs.VideoNode:
     v2 = v1 + v1
     v3 = v2 + v1
     n = get_neutral_value(src, chroma=True)
+    luma = padder(luma, left=4, right=4, top=0, bottom=0)
     w, h = luma.width, luma.height
 
-    luma = padder(luma, left=4, right=4, top=0, bottom=0)
     clean1 = luma.std.SeparateFields(True)
     clean1 = vinverse(clean1, vinverse2=True, mode='v').std.DoubleWeave(True).std.SelectEvery(2, 0)
     d1 = core.std.MakeDiff(luma, clean1)
