@@ -3,6 +3,7 @@ Functions to remove dotcrawl
 """
 
 from vsutil import get_depth, get_y, depth, get_neutral_value, scale_value
+from lvsfunc.util import padder
 from .deblend import vinverse
 from .misc import repair
 from .blur import sbr
@@ -32,6 +33,7 @@ def ddcomb(src: vs.VideoNode, **frfun7over: Any) -> vs.VideoNode:
     n = get_neutral_value(src, chroma=True)
     w, h = luma.width, luma.height
 
+    luma = padder(luma, left=4, right=4, top=0, bottom=0)
     clean1 = luma.std.SeparateFields(True)
     clean1 = vinverse(clean1, vinverse2=True, mode='v').std.DoubleWeave(True).std.SelectEvery(2, 0)
     d1 = core.std.MakeDiff(luma, clean1)
@@ -48,5 +50,5 @@ def ddcomb(src: vs.VideoNode, **frfun7over: Any) -> vs.VideoNode:
     dd = core.std.Expr([dd, shrpD], f'x {n} - y {n} - * 0 < {n} x {n} - abs y {n} - abs < x y ? ?')
     expr = f'x {v3} + y < x {v2} + x y < x {v1} + x {v3} - y > x {v2} - x y > x {v1} - x ? ? ? ?'
     clean1c = core.std.Expr([clean1b, clean1a], expr)
-    clean1c = core.std.MergeDiff(clean1c, sbr(dd))
+    clean1c = core.std.MergeDiff(clean1c, sbr(dd)).std.Crop(4, 4)
     return core.std.ShufflePlanes([clean1c, src], [0, 1, 2], vs.YUV)
