@@ -5,7 +5,7 @@ Deblend functions
 from functools import partial
 from typing import List, Sequence
 from vsutil import get_neutral_value, scale_value, get_depth
-from .util import inter_pattern, jdeblend_eval
+from .util import inter_pattern, jdeblend_eval, ex_planes
 from .blur import sbr
 import vapoursynth as vs
 core = vs.core
@@ -145,12 +145,6 @@ def vinverse(src: vs.VideoNode,
     """
 
     neutral = get_neutral_value(src, chroma=True)
-    plane_range = range(src.format.num_planes)
-
-    if planes is None:
-        planes = list(plane_range)
-    elif isinstance(planes, int):
-        planes = [planes]
 
     expr = [f'x y - {neutral} + vbd! '  # vblurD
             f'y y z - {sstr} * + round '  # vshrp
@@ -170,12 +164,12 @@ def vinverse(src: vs.VideoNode,
         blur = sbr(src, mode=mode, planes=planes)
         blur2 = blur.std.Convolution([1, 2, 1], mode=mode, planes=planes)
 
-    vnv = core.akarin.Expr([src, blur, blur2], [expr[0] if i in planes else '' for i in plane_range])
+    vnv = core.akarin.Expr([src, blur, blur2], ex_planes(src, expr, planes))
 
     if amnt <= 0:
         return src
     elif amnt < 255:
         amn = scale_value(amnt, 8, get_depth(src))
-        expr = f'x {amn} + y < x {amn} + x {amn} - y > x {amn} - y ? ?'
-        vnv = core.akarin.Expr([src, vnv], [expr if i in planes else '' for i in plane_range])
+        expr = [f'x {amn} + y < x {amn} + x {amn} - y > x {amn} - y ? ?']
+        vnv = core.akarin.Expr([src, vnv], ex_planes(src, expr, planes))
     return vnv

@@ -2,7 +2,7 @@
 Helper functions
 """
 
-from typing import List
+from typing import List, Sequence
 import vapoursynth as vs
 core = vs.core
 
@@ -75,3 +75,13 @@ def jdeblend_eval(n: int, f: List[vs.VideoFrame], src: vs.VideoNode, inters: Lis
     if comb[0] == 1:
         src = inters[pattern]
     return src[n+1] if sum(comb) == 2 else src
+
+
+def ex_planes(src: vs.VideoNode, expr: List[str], planes: int | Sequence[int] | None = None) -> List[str]:
+
+    if planes is not None:
+        plane_range = range(src.format.num_planes)
+        planes = [planes] if isinstance(planes, int) else planes
+        expr = [expr[0] if i in planes else '' for i in plane_range]
+
+    return expr

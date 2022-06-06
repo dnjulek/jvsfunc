@@ -3,8 +3,8 @@ Blur functions
 """
 
 from typing import Sequence
-from .util import ex_matrix
 from vsutil import get_neutral_value
+from .util import ex_matrix, ex_planes
 import vapoursynth as vs
 core = vs.core
 
@@ -21,12 +21,6 @@ def sbr(src: vs.VideoNode, r: int = 1, mode: str = 'hv', planes: int | Sequence[
     """
 
     neutral = get_neutral_value(src, chroma=True)
-    plane_range = range(src.format.num_planes)
-
-    if planes is None:
-        planes = list(plane_range)
-    elif isinstance(planes, int):
-        planes = [planes]
 
     match mode:
         case 'hv':
@@ -48,11 +42,11 @@ def sbr(src: vs.VideoNode, r: int = 1, mode: str = 'hv', planes: int | Sequence[
         case _:
             raise ValueError("sbr: Invalid r, use 1, 2 or 3.")
 
-    expr = f'x y - x {neutral} - * 0 < {neutral} x y - abs x {neutral} - abs < x y - {neutral} + x ? ?'
+    expr = [f'x y - x {neutral} - * 0 < {neutral} x y - abs x {neutral} - abs < x y - {neutral} + x ? ?']
     rg11 = src.std.Convolution(matrix=matrix, planes=planes, mode=mode)
     rg11d = core.std.MakeDiff(src, rg11, planes=planes)
     rg11ds = rg11d.std.Convolution(matrix=matrix, planes=planes, mode=mode)
-    rg11dd = core.std.Expr([rg11d, rg11ds], [expr if i in planes else '' for i in plane_range])
+    rg11dd = core.std.Expr([rg11d, rg11ds], ex_planes(rg11d, expr, planes))
     return core.std.MakeDiff(src, rg11dd, planes=planes)
 
 
