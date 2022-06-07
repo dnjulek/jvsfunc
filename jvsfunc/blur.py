@@ -2,11 +2,72 @@
 Blur functions
 """
 
+import math
 from typing import Sequence
-from vsutil import get_neutral_value
 from .util import ex_matrix, ex_planes
+from vsutil import get_neutral_value
+from vsutil import split, join
 import vapoursynth as vs
 core = vs.core
+
+
+def gauss(src: vs.VideoNode, sigma: float = 0.5, mode: str = 'hv') -> vs.VideoNode:
+    """
+    The fastest gaussian blur without sigma limitation.
+
+    :param src: Input clip.
+    :param sigma: Standard deviation of gaussian blur.
+    :param mode: 'h', 'v' or 'hv', to apply the filter horizontally, vertically, or both.
+    """
+
+    def gauss_conv(src: vs.VideoNode, sigma: float = 2, mode: str = 'hv') -> vs.VideoNode:
+
+        taps = int(math.ceil(sigma * 6 + 1))
+        if not taps % 2:
+            taps += 1
+
+        kernel = []
+        for x in range(int(math.floor(taps / 2))):
+            kernel.append(1.0 / (math.sqrt(2.0 * math.pi) * sigma) * math.exp(-(x * x) / (2 * sigma * sigma)))
+
+        for i in range(1, len(kernel)):
+            kernel[i] *= 1023 / kernel[0]
+        kernel[0] = 1023
+
+        kernel = kernel[::-1] + kernel[1:]
+        return src.std.Convolution(kernel, mode=mode)
+
+    def gauss_fmtc(src: vs.VideoNode, sigma: float = 2, mode: str = 'hv') -> vs.VideoNode:
+        wsrc, hsrc = src.width, src.height
+
+        match mode:
+            case 'h':
+                wdown, hdown = round(wsrc/sigma), hsrc
+            case 'v':
+                wdown, hdown = wsrc, round(hsrc/sigma)
+            case 'hv' | 'vh':
+                wdown, hdown = round(wsrc/sigma), round(hsrc/sigma)
+            case _:
+                raise ValueError("gauss: Invalid mode, use 'h', 'v' or 'hv'.")
+
+        def blur(src: vs.VideoNode):
+            src = src.resize.Bilinear(wdown, hdown)
+            return src.fmtc.resample(wsrc, hsrc, kernel='gauss', a1=9)
+
+        odd = wdown % 2 == 1 or hdown % 2 == 1
+        if odd and src.format.color_family != vs.GRAY:
+            yuv = split(src)
+            yuv = [blur(i) for i in yuv]
+            return join(yuv)
+        else:
+            return blur(src)
+
+    if sigma < 0.334:
+        return src
+    elif sigma <= 4.333:
+        return gauss_conv(src, sigma, mode)
+    else:
+        return gauss_fmtc(src, sigma, mode)
 
 
 def sbr(src: vs.VideoNode, r: int = 1, mode: str = 'hv', planes: int | Sequence[int] | None = None) -> vs.VideoNode:
@@ -16,14 +77,14 @@ def sbr(src: vs.VideoNode, r: int = 1, mode: str = 'hv', planes: int | Sequence[
 
     :param src: Input clip.
     :param r: 1, 2 or 3 (blur strength).
-    :param mode: 'h', 'v' or 'hv' (std.Convolution modes).
+    :param mode: 'h', 'v' or 'hv', to apply the filter horizontally, vertically, or both.
     :param planes: Planes to process.
     """
 
     neutral = get_neutral_value(src, chroma=True)
 
     match mode:
-        case 'hv':
+        case 'hv' | 'vh':
             matrix2 = [1, 3, 4, 3, 1]
             matrix3 = [1, 4, 8, 10, 8, 4, 1]
         case 'h' | 'v':
