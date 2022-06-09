@@ -2,6 +2,8 @@
 Some functions to generate VSEdit Bookmarks file with a list of frames, to be used in scene filtering.
 """
 
+from __future__ import annotations
+
 from lvsfunc.render import clip_async_render
 from .util import bookmarks, rng
 from vsutil import depth

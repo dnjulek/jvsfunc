@@ -2,6 +2,8 @@
 Blur functions
 """
 
+from __future__ import annotations
+
 import math
 from typing import Sequence
 from .util import ex_matrix, ex_planes
@@ -40,15 +42,14 @@ def gauss(src: vs.VideoNode, sigma: float = 0.5, mode: str = 'hv') -> vs.VideoNo
     def gauss_fmtc(src: vs.VideoNode, sigma: float = 2, mode: str = 'hv') -> vs.VideoNode:
         wsrc, hsrc = src.width, src.height
 
-        match mode:
-            case 'h':
-                wdown, hdown = round(wsrc/sigma), hsrc
-            case 'v':
-                wdown, hdown = wsrc, round(hsrc/sigma)
-            case 'hv' | 'vh':
-                wdown, hdown = round(wsrc/sigma), round(hsrc/sigma)
-            case _:
-                raise ValueError("gauss: Invalid mode, use 'h', 'v' or 'hv'.")
+        if mode == 'h':
+            wdown, hdown = round(wsrc/sigma), hsrc
+        elif mode == 'v':
+            wdown, hdown = wsrc, round(hsrc/sigma)
+        elif mode in ['hv', 'vh']:
+            wdown, hdown = round(wsrc/sigma), round(hsrc/sigma)
+        else:
+            raise ValueError("gauss: Invalid mode, use 'h', 'v' or 'hv'.")
 
         def blur(src: vs.VideoNode):
             src = src.resize.Bilinear(wdown, hdown)
@@ -83,25 +84,23 @@ def sbr(src: vs.VideoNode, r: int = 1, mode: str = 'hv', planes: int | Sequence[
 
     neutral = get_neutral_value(src, chroma=True)
 
-    match mode:
-        case 'hv' | 'vh':
-            matrix2 = [1, 3, 4, 3, 1]
-            matrix3 = [1, 4, 8, 10, 8, 4, 1]
-        case 'h' | 'v':
-            matrix2 = [1, 6, 15, 20, 15, 6, 1]
-            matrix3 = [1, 10, 45, 120, 210, 252, 210, 120, 45, 10, 1]
-        case _:
-            raise ValueError("sbr: Invalid mode, use 'h', 'v' or 'hv'.")
+    if mode in ['hv', 'vh']:
+        matrix2 = [1, 3, 4, 3, 1]
+        matrix3 = [1, 4, 8, 10, 8, 4, 1]
+    elif mode in ['h', 'v']:
+        matrix2 = [1, 6, 15, 20, 15, 6, 1]
+        matrix3 = [1, 10, 45, 120, 210, 252, 210, 120, 45, 10, 1]
+    else:
+        raise ValueError("sbr: Invalid mode, use 'h', 'v' or 'hv'.")
 
-    match r:
-        case 1:
-            matrix = [1, 2, 1]
-        case 2:
-            matrix = matrix2
-        case 3:
-            matrix = matrix3
-        case _:
-            raise ValueError("sbr: Invalid r, use 1, 2 or 3.")
+    if r == 1:
+        matrix = [1, 2, 1]
+    elif r == 2:
+        matrix = matrix2
+    elif r == 3:
+        matrix = matrix3
+    else:
+        raise ValueError("sbr: Invalid r, use 1, 2 or 3.")
 
     expr = [f'x y - x {neutral} - * 0 < {neutral} x y - abs x {neutral} - abs < x y - {neutral} + x ? ?']
     rg11 = src.std.Convolution(matrix=matrix, planes=planes, mode=mode)

@@ -2,6 +2,8 @@
 Helper functions
 """
 
+from __future__ import annotations
+
 from typing import List, Sequence
 import vapoursynth as vs
 core = vs.core

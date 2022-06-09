@@ -1,3 +1,5 @@
+# flake8: noqa
+
 from .blur import *
 from .deblend import *
 from .denoise import *

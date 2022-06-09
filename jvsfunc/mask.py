@@ -2,6 +2,8 @@
 Masks functions
 """
 
+from __future__ import annotations
+
 from vsutil import depth, iterate, get_depth, get_y
 from math import sqrt
 import vapoursynth as vs

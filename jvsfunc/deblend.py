@@ -2,6 +2,8 @@
 Deblend functions
 """
 
+from __future__ import annotations
+
 from functools import partial
 from typing import List, Sequence
 from vsutil import get_neutral_value, scale_value, get_depth

@@ -2,6 +2,8 @@
 Functions to remove dotcrawl
 """
 
+from __future__ import annotations
+
 from vsutil import get_depth, get_y, depth, get_neutral_value, scale_value
 from lvsfunc.util import padder
 from .deblend import vinverse
