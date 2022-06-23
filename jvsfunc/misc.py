@@ -5,10 +5,33 @@ Miscellaneous functions
 from __future__ import annotations
 
 from functools import partial
-from typing import List, Optional
+from typing import List, Sequence
+from vsutil import depth, get_depth
 from .util import morpho_matrix
+from .blur import gauss
 import vapoursynth as vs
 core = vs.core
+
+
+def retinex(src: vs.VideoNode, sigmas: Sequence[float | int] = [25, 80, 250]) -> vs.VideoNode:
+    """
+    [WIP] non-final version.
+    A Multi Scale Retinex implementation ~5x faster than the current VS plugin.
+    The output is not exactly the same and currently only works with GRAY.
+
+    :param src: Input clip.
+    :param sigmas: sigma list for Gaussian blur, should be a list with 3 elements.
+    """
+    if len(sigmas) != 3:
+        raise ValueError('retinex: sigma should be a list with 3 elements.')
+
+    luma = src.resize.Point(format=vs.GRAY16, range=1)
+    gain = luma.akarin.Expr('x 1000 +', format=vs.GRAYS)
+    blur = [gauss(gain, i) for i in sigmas]
+    msr = core.akarin.Expr([gain] + blur, 'x log dup xl! y log - xl@ z log - xl@ a log - + + 3 / 10 log /')
+    balance = msr.std.PlaneStats().akarin.Expr('x x.PlaneStatsMin - x.PlaneStatsMax x.PlaneStatsMin - /')
+    balance = balance.resize.Point(format=vs.GRAY16).akarin.Expr('x 1000 -')
+    return depth(balance, get_depth(src))
 
 
 def repair(src: vs.VideoNode, ref: vs.VideoNode, mode: int = 1) -> vs.VideoNode:
@@ -88,7 +111,7 @@ def FreezeFramesMod(src: vs.VideoNode, mode: str = 'prev', ranges: List[int] = [
 ffmod = FreezeFramesMod
 
 
-def replace_keyframe(src: vs.VideoNode, thr: float = 0.30, kf_list: Optional[List[int]] = None,
+def replace_keyframe(src: vs.VideoNode, thr: float = 0.30, kf_list: List[int] | None = None,
                      show_thr: bool = False) -> vs.VideoNode:
     """
     Replace the frame after a scene change with the next frame. Helps to fix broken keyframes.
