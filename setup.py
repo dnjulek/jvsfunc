@@ -1,9 +1,14 @@
 from setuptools import setup
 
+with open("README.md") as fh:
+    long_desc = fh.read()
+
 setup(
     name='jvsfunc',
     version='1.0.2',
     description='Julek VapourSynth functions',
+    long_description=long_desc,
+    long_description_content_type="text/markdown",
     url='https://github.com/dnjulek/jvsfunc',
     license='MIT',
     author='Julek',
