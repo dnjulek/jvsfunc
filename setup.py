@@ -5,7 +5,7 @@ with open("README.md") as fh:
 
 setup(
     name='jvsfunc',
-    version='1.0.2',
+    version='1.0.3',
     description='Julek VapourSynth functions',
     long_description=long_desc,
     long_description_content_type="text/markdown",
