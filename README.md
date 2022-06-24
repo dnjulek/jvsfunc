@@ -11,5 +11,8 @@ Julek’s VapourSynth functions. Very simple functions, don't expect too much, I
 * [VapourSynth-TDeintMod](https://github.com/HomeOfVapourSynthEvolution/VapourSynth-TDeintMod)
 
 # Install
+Just `pip install jvsfunc`
+
+Or from master:
 1. install [Git](https://git-scm.com/downloads)
 2. in CMD/PowerShell run: `pip install git+https://github.com/dnjulek/jvsfunc.git`
