@@ -5,7 +5,7 @@ with open("README.md") as fh:
 
 setup(
     name='jvsfunc',
-    version='1.0.3',
+    version='1.0.4',
     description='Julek VapourSynth functions',
     long_description=long_desc,
     long_description_content_type="text/markdown",
@@ -18,8 +18,9 @@ setup(
     },
     install_requires=[
         'vapoursynth>=58',
+        'vsrgtools>=0.1.4',
         'lvsfunc',
-        'vsutil',
+        'vsutil>=0.8.0',
     ],
     zip_safe=False,
     python_requires='>=3.8',
