@@ -5,8 +5,6 @@ Denoise functions
 from __future__ import annotations
 
 from vsutil import plane, depth, get_depth, split, join
-from lvsfunc.scale import ssim_downsample
-from lvsfunc.util import get_prop
 from typing import Any
 import vapoursynth as vs
 core = vs.core
@@ -38,6 +36,8 @@ def ccd(src: vs.VideoNode,
     :param kwargs: Arguments passed to ssim_downsample.
     """
 
+    from lvsfunc.scale import ssim_downsample
+    from lvsfunc.util import get_prop
     if src.format.color_family == vs.GRAY:
         raise ValueError('ccd: GRAY format is not supported.')
 

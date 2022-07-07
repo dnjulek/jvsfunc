@@ -5,7 +5,6 @@ Functions to remove dotcrawl
 from __future__ import annotations
 
 from vsutil import get_depth, get_y, depth, get_neutral_value, scale_value
-from lvsfunc.util import padder
 from .deblend import vinverse
 from .misc import repair
 from .blur import sbr
@@ -25,6 +24,7 @@ def ddcomb(src: vs.VideoNode, **frfun7over: Any) -> vs.VideoNode:
     :param frfun7over: Frfun7 parameter overrides.
     """
 
+    from lvsfunc.util import padder
     frfun7args: Dict[str, Any] = dict(l=1.01, t=8.0, p=0, tp1=0, r1=3)
     frfun7args.update(frfun7over)
 

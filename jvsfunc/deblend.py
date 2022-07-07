@@ -7,10 +7,27 @@ from __future__ import annotations
 from functools import partial
 from typing import List, Sequence
 from vsutil import get_neutral_value, scale_value, get_depth
-from .util import inter_pattern, jdeblend_eval, ex_planes
+from .util import _ex_planes
 from .blur import sbr
 import vapoursynth as vs
 core = vs.core
+
+
+def _inter_pattern(clipa: List[vs.VideoNode], clipb: List[vs.VideoNode]) -> List[vs.VideoNode]:
+    inter0 = core.std.Interleave([clipb[0], clipa[1], clipa[2], clipa[3], clipa[4]])
+    inter1 = core.std.Interleave([clipa[0], clipb[1], clipa[2], clipa[3], clipa[4]])
+    inter2 = core.std.Interleave([clipa[0], clipa[1], clipb[2], clipa[3], clipa[4]])
+    inter3 = core.std.Interleave([clipa[0], clipa[1], clipa[2], clipb[3], clipa[4]])
+    inter4 = core.std.Interleave([clipa[0], clipa[1], clipa[2], clipa[3], clipb[4]])
+    return [inter0, inter1, inter2, inter3, inter4]
+
+
+def _jdeblend_eval(n: int, f: List[vs.VideoFrame], src: vs.VideoNode, inters: List[vs.VideoNode]) -> vs.VideoNode:
+    comb = [f[i].props['_Combed'] for i in [0, 1]]
+    pattern = n % 5
+    if comb[0] == 1:
+        src = inters[pattern]
+    return src[n+1] if sum(comb) == 2 else src
 
 
 def jdeblend(src_fm: vs.VideoNode, src: vs.VideoNode, vnv: bool = True) -> vs.VideoNode:
@@ -35,9 +52,9 @@ def jdeblend(src_fm: vs.VideoNode, src: vs.VideoNode, vnv: bool = True) -> vs.Vi
 
     select_src = [src.std.SelectEvery(5, i) for i in range(5)]
     select_dbd = [dbd.std.SelectEvery(5, i) for i in range(5)]
-    inters = inter_pattern(select_src, select_dbd)
+    inters = _inter_pattern(select_src, select_dbd)
     psrc = [src_fm, src_fm[0]+src_fm[:-1]]
-    return core.std.FrameEval(src_fm, partial(jdeblend_eval, src=src_fm, inters=inters), psrc)
+    return core.std.FrameEval(src_fm, partial(_jdeblend_eval, src=src_fm, inters=inters), psrc)
 
 
 def jdeblend_bob(src_fm: vs.VideoNode, bobbed: vs.VideoNode) -> vs.VideoNode:
@@ -65,9 +82,9 @@ def jdeblend_bob(src_fm: vs.VideoNode, bobbed: vs.VideoNode) -> vs.VideoNode:
 
     select_src = [src_fm.std.SelectEvery(5, i) for i in range(5)]
     select_dbd = [dbd.std.SelectEvery(5, i) for i in range(5)]
-    inters = inter_pattern(select_src, select_dbd)
+    inters = _inter_pattern(select_src, select_dbd)
     psrc = [src_fm, src_fm[0]+src_fm[:-1]]
-    return core.std.FrameEval(src_fm, partial(jdeblend_eval, src=src_fm, inters=inters), psrc)
+    return core.std.FrameEval(src_fm, partial(_jdeblend_eval, src=src_fm, inters=inters), psrc)
 
 
 def jdeblend_kf(src: vs.VideoNode, src_fm: vs.VideoNode) -> vs.VideoNode:
@@ -166,12 +183,12 @@ def vinverse(src: vs.VideoNode,
         blur = sbr(src, mode=mode, planes=planes)
         blur2 = blur.std.Convolution([1, 2, 1], mode=mode, planes=planes)
 
-    vnv = core.akarin.Expr([src, blur, blur2], ex_planes(src, expr, planes))
+    vnv = core.akarin.Expr([src, blur, blur2], _ex_planes(src, expr, planes))
 
     if amnt <= 0:
         return src
     elif amnt < 255:
         amn = scale_value(amnt, 8, get_depth(src))
         expr = [f'x {amn} + y < x {amn} + x {amn} - y > x {amn} - y ? ?']
-        vnv = core.akarin.Expr([src, vnv], ex_planes(src, expr, planes))
+        vnv = core.akarin.Expr([src, vnv], _ex_planes(src, expr, planes))
     return vnv

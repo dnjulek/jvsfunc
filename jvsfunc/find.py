@@ -4,8 +4,7 @@ Some functions to generate VSEdit Bookmarks file with a list of frames, to be us
 
 from __future__ import annotations
 
-from lvsfunc.render import clip_async_render
-from .util import bookmarks, rng
+from .util import _bookmarks, _rng
 from vsutil import depth
 import operator as opr
 from typing import Any
@@ -34,6 +33,7 @@ def find_prop(src: vs.VideoNode,
     :param min_length: Amount of frames to finish a sequence, to avoid false negatives.
     """
 
+    from lvsfunc.render import clip_async_render
     ops = {
         "<": opr.lt,
         "<=": opr.le,
@@ -53,8 +53,8 @@ def find_prop(src: vs.VideoNode,
 
     clip_async_render(src, progress=dbug, callback=_cb)
     if return_ranges:
-        frames = rng(frames, min_length)
-    frames = bookmarks(frames, name)
+        frames = _rng(frames, min_length)
+    frames = _bookmarks(frames, name)
     return src
 
 

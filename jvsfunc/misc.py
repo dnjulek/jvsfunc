@@ -7,7 +7,7 @@ from __future__ import annotations
 from functools import partial
 from typing import List
 from vsutil import depth, get_depth
-from .util import morpho_matrix
+from .util import _morpho_matrix
 import vapoursynth as vs
 core = vs.core
 
@@ -64,7 +64,7 @@ def dilate(src: vs.VideoNode, size: int = 5) -> vs.VideoNode:
     """
     Same result as core.morpho.Dilate(), faster and workable in 32 bit.
     """
-    expr = morpho_matrix(size, mm='max')
+    expr = _morpho_matrix(size, mm='max')
     return core.akarin.Expr(src, expr)
 
 
@@ -72,7 +72,7 @@ def erode(src: vs.VideoNode, size: int = 5) -> vs.VideoNode:
     """
     Same result as core.morpho.Erode(), faster and workable in 32 bit.
     """
-    expr = morpho_matrix(size, mm='min')
+    expr = _morpho_matrix(size, mm='min')
     return core.akarin.Expr(src, expr)
 
 

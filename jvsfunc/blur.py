@@ -4,9 +4,8 @@ Blur functions
 
 from __future__ import annotations
 
-
 from typing import Sequence
-from .util import ex_matrix, ex_planes
+from .util import _ex_matrix, _ex_planes
 from vsutil import get_neutral_value
 import vapoursynth as vs
 core = vs.core
@@ -47,7 +46,7 @@ def sbr(src: vs.VideoNode, r: int = 1, mode: str = 'hv', planes: int | Sequence[
     rg11 = src.std.Convolution(matrix=matrix, planes=planes, mode=mode)
     rg11d = core.std.MakeDiff(src, rg11, planes=planes)
     rg11ds = rg11d.std.Convolution(matrix=matrix, planes=planes, mode=mode)
-    rg11dd = core.std.Expr([rg11d, rg11ds], ex_planes(rg11d, expr, planes))
+    rg11dd = core.std.Expr([rg11d, rg11ds], _ex_planes(rg11d, expr, planes))
     return core.std.MakeDiff(src, rg11dd, planes=planes)
 
 
@@ -61,5 +60,5 @@ def medianblur(src: vs.VideoNode, radius: int = 2) -> vs.VideoNode:
     sp = rb//2 - 1
     dp = st - 2
     expr = f'sort{st} swap{sp} min! swap{sp} max! drop{dp} x min@ max@ clip'
-    expr = ex_matrix(radius) + expr
+    expr = _ex_matrix(radius) + expr
     return src.akarin.Expr(expr)
