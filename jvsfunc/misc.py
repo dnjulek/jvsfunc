@@ -6,39 +6,65 @@ from __future__ import annotations
 
 from functools import partial
 from typing import List
-from vsutil import depth, get_depth
-from .util import _morpho_matrix
+from vsutil import get_depth, get_y, scale_value, EXPR_VARS
+from .util import _morpho_matrix, plane_stats
 import vapoursynth as vs
 core = vs.core
 
 
-def retinex(src: vs.VideoNode, sigmas: List[float | int] = [25, 80, 250], fast: bool = False) -> vs.VideoNode:
+def retinex(src: vs.VideoNode,
+            sigmas: List[float | int] = [25, 80, 250],
+            lower_thr: float = 0,
+            upper_thr: float = 0,
+            cuda: bool = False,
+            fast: bool = False
+            ) -> vs.VideoNode:
     """
-    [WIP] non-final version.
-    A Multi Scale Retinex implementation ~5x faster than the current VS plugin.
-    The output is not exactly the same and currently only works with GRAY.
+    A Multi Scale Retinex implementation that can be faster than the current VS plugin.
 
     :param src: Input clip.
-    :param sigmas: Sigma list for Gaussian blur, should be a list with 3 elements.
+    :param sigmas: Sigma list for Gaussian blur.
+    :param lower_thr: Controls the white balance, will be VERY SLOW if lower_thr > 0 and cuda=False.
+    :param upper_thr: Controls the white balance, will be VERY SLOW if upper_thr > 0 and cuda=False.
+    :param cuda: Enables cupy, will be VERY SLOW if False and lower_thr > 0 or upper_thr > 0.
     :param fast: Replaces the strongest Gaussian blur with PlaneStatsAverage.
     """
-    from vsrgtools import gauss_blur
-    if len(sigmas) != 3:
-        raise ValueError('retinex: sigma should be a list with 3 elements.')
 
-    luma = src.resize.Point(format=vs.GRAY16, range=1)
-    gain = luma.akarin.Expr('x 1000 +', format=vs.GRAYS)
-    expr = 'x log dup xl! y log - xl@ z log - xl@ a log - + + 3 / 10 log /'
+    from warnings import warn
+    from vsrgtools import gauss_blur
+    if not cuda and (lower_thr > 0 or upper_thr > 0):
+        warn("retinex: you are using lower_thr/upper_thr without cuda, speed drastically reduced!")
+
+    luma = get_y(src).std.PlaneStats()
+    is_float = luma.format.sample_type == vs.FLOAT
+
+    if is_float:
+        luma_float = luma.akarin.Expr("x x.PlaneStatsMin - x.PlaneStatsMax x.PlaneStatsMin - /")
+    else:
+        luma_float = luma.akarin.Expr("1 x.PlaneStatsMax x.PlaneStatsMin - / x x.PlaneStatsMin - *", format=vs.GRAYS)
+
+    slen = len(sigmas)
+    slen_fast = (slen - 1) if fast else slen
+    ev_list = [EXPR_VARS[i+1] for i in range(slen_fast)]
+    expr_msr = "".join([f"{i} 0 <= 1 x {i} / 1 + ? " for i in ev_list])
+
     if fast:
-        expr = 'x log dup xl! y log - xl@ z log - xl@ x.PlaneStatsAverage log - + + 3 / 10 log /'
-        gain = gain.std.PlaneStats()
+        expr_msr = expr_msr + "x.PlaneStatsMax 0 <= 1 x x.PlaneStatsMax / 1 + ? "
         sigmas.remove(max(sigmas))
 
-    blur = [gauss_blur(gain, i) for i in sigmas]
-    msr = core.akarin.Expr([gain] + blur, expr)
-    balance = msr.std.PlaneStats().akarin.Expr('x x.PlaneStatsMin - x.PlaneStatsMax x.PlaneStatsMin - /')
-    balance = balance.resize.Point(format=vs.GRAY16).akarin.Expr('x 1000 -')
-    return depth(balance, get_depth(src))
+    expr_msr = expr_msr + f"{'+ ' * (slen-1)}log {slen} /"
+    blur_list = [gauss_blur(luma_float, i) for i in sigmas]
+    msr = core.akarin.Expr([luma_float] + blur_list, expr_msr)
+    msr_stats = plane_stats(msr, lower_thr, upper_thr, cuda)
+    expr_balance = "x x.PlaneStatsMin - x.PlaneStatsMax x.PlaneStatsMin - /"
+
+    if not is_float:
+        _floor = scale_value(16, 8, get_depth(luma))
+        _ceil = scale_value(235, 8, get_depth(luma))
+        _range = _ceil - _floor
+        expr_balance = expr_balance + f" {_range} * {_floor} + round {_floor} {_ceil} clamp"
+
+    return msr_stats.akarin.Expr(expr_balance, format=luma.format)
 
 
 def repair(src: vs.VideoNode, ref: vs.VideoNode, mode: int = 1) -> vs.VideoNode:
