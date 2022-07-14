@@ -4,12 +4,41 @@ Masks functions
 
 from __future__ import annotations
 
-from vsutil import depth, iterate, get_depth, get_y, get_peak_value, scale_value
+from vsutil import depth, iterate, get_depth, get_y, get_peak_value, scale_value, Dither, Range
 from typing import Sequence
 from .misc import retinex
 from math import sqrt
 import vapoursynth as vs
 core = vs.core
+
+
+def flat_mask(src: vs.VideoNode, radius: int = 5, thr: int = 3, use_gauss: bool = False) -> vs.VideoNode:
+    """
+    Binarizes the image using thresholding for a pixel based on a small region around it.
+
+    :param src: Input clip.
+    :param radius: Size of the region around the pixel to find the threshold.
+    :param thr: Controls the threshold.
+    :param use_gauss: Uses Gaussian blur instead of Mean/BoxBlur to filter the region around the pixel.
+    """
+
+    luma = get_y(src)
+
+    def boxblur(src: vs.VideoNode, r: int) -> vs.VideoNode:
+        if r > 12:
+            return src.std.BoxBlur(0, r, 1, r, 1)
+        else:
+            block_size = (r * 2) + 1
+            return src.std.Convolution([1] * block_size, mode='hv')
+
+    if use_gauss:
+        from vsrgtools import gauss_blur
+        blur = gauss_blur(luma, radius * 0.361083333)
+    else:
+        blur = boxblur(luma, radius)
+
+    mask = core.abrz.AdaptiveBinarize(depth(luma, 8), depth(blur, 8), thr)
+    return depth(mask, get_depth(luma), dither_type=Dither.NONE, range_in=Range.FULL, range=Range.FULL)
 
 
 def retinex_edgemask(src: vs.VideoNode,
