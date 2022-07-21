@@ -7,7 +7,7 @@ from __future__ import annotations
 from functools import partial
 from typing import List
 from vsutil import get_depth, get_y, scale_value, EXPR_VARS
-from .util import _morpho_matrix, plane_stats
+from .util import _morpho_matrix
 import vapoursynth as vs
 core = vs.core
 
@@ -55,7 +55,7 @@ def retinex(src: vs.VideoNode,
     expr_msr = expr_msr + f"{'+ ' * (slen-1)}log {slen} /"
     blur_list = [gauss_blur(luma_float, i) for i in sigmas]
     msr = core.akarin.Expr([luma_float] + blur_list, expr_msr)
-    msr_stats = plane_stats(msr, lower_thr, upper_thr, cuda)
+    msr_stats = msr.psm.PlaneStatsMod(lower_thr, upper_thr)
     expr_balance = "x x.PlaneStatsMin - x.PlaneStatsMax x.PlaneStatsMin - /"
 
     if not is_float:

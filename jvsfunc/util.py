@@ -5,53 +5,8 @@ Helper functions
 from __future__ import annotations
 
 from typing import List, Sequence
-from math import floor, ceil
 import vapoursynth as vs
 core = vs.core
-
-
-def plane_stats(src: vs.VideoNode, lower_thr: float = 0, upper_thr: float = 0, cuda: bool = False) -> vs.VideoNode:
-    """
-    Settable PlaneStats func.
-
-    :param src: Input clip.
-    :param lower_thr: Define the ratio of pixel number to determine the Floor of value range.
-    :param upper_thr: Define the ratio of pixel number to determine the Ceil of value range.
-    :cuda: Enables cupy.
-    """
-
-    if (lower_thr + upper_thr) >= 1:
-        raise ValueError('plane_stats: (lower_thr + upper_thr) cannot be >= 1.')
-
-    if (lower_thr == 0) and (upper_thr == 0):
-        return src.std.PlaneStats()
-
-    is_float = src.format.sample_type == vs.FLOAT
-    total = src.height * src.width
-    minthr = floor((total - 1) * lower_thr)
-    maxthr = ceil((total - 1) * (1 - upper_thr))
-
-    def process(n, f: vs.VideoFrame):
-        if cuda:
-            import cupy as cp
-            arr = cp.array(f[0])
-            arr = cp.reshape(arr, (total))
-            arr = cp.sort(arr)
-        else:
-            import numpy as np
-            arr = np.array(f[0])
-            arr = np.reshape(arr, (total))
-            arr = np.sort(arr)
-
-        pmin = float(arr[minthr]) if is_float else int(arr[minthr])
-        pmax = float(arr[maxthr]) if is_float else int(arr[maxthr])
-
-        fout = f.copy()
-        fout.props['PlaneStatsMin'] = pmin
-        fout.props['PlaneStatsMax'] = pmax
-        return fout
-
-    return src.std.ModifyFrame(src, process)
 
 
 def _bookmarks(flist: List[int], name: str):
