@@ -56,7 +56,7 @@ def retinex_edgemask(src: vs.VideoNode,
     luma = get_y(src)
     max_value = get_peak_value(src)
     sbrz = scale_value(brz, 16, get_depth(src))
-    ret = retinex(luma, retinex_sigmas)
+    ret = retinex(luma, retinex_sigmas, 0.001, 0.005)
     tcanny = ret.tcanny.TCanny(mode=1, sigma=tcanny_sigma).std.Minimum(coordinates=[1, 0, 1, 0, 0, 1, 0, 1])
     kirsch1 = luma.std.Convolution(matrix=[5,  5,  5, -3,  0, -3, -3, -3, -3], saturate=False)
     kirsch2 = luma.std.Convolution(matrix=[-3,  5,  5, -3,  0,  5, -3, -3, -3], saturate=False)

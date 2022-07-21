@@ -14,9 +14,8 @@ core = vs.core
 
 def retinex(src: vs.VideoNode,
             sigmas: List[float | int] = [25, 80, 250],
-            lower_thr: float = 0,
-            upper_thr: float = 0,
-            cuda: bool = False,
+            lower_thr: float = 0.001,
+            upper_thr: float = 0.001,
             fast: bool = False
             ) -> vs.VideoNode:
     """
@@ -24,16 +23,12 @@ def retinex(src: vs.VideoNode,
 
     :param src: Input clip.
     :param sigmas: Sigma list for Gaussian blur.
-    :param lower_thr: Controls the white balance, will be VERY SLOW if lower_thr > 0 and cuda=False.
-    :param upper_thr: Controls the white balance, will be VERY SLOW if upper_thr > 0 and cuda=False.
-    :param cuda: Enables cupy, will be VERY SLOW if False and lower_thr > 0 or upper_thr > 0.
-    :param fast: Replaces the strongest Gaussian blur with PlaneStatsAverage.
+    :param lower_thr: Controls the white balance.
+    :param upper_thr: Controls the white balance.
+    :param fast: Replaces the strongest Gaussian blur with PlaneStatsMax.
     """
 
-    from warnings import warn
     from vsrgtools import gauss_blur
-    if not cuda and (lower_thr > 0 or upper_thr > 0):
-        warn("retinex: you are using lower_thr/upper_thr without cuda, speed drastically reduced!")
 
     luma = get_y(src).std.PlaneStats()
     is_float = luma.format.sample_type == vs.FLOAT
