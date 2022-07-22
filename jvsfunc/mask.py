@@ -67,7 +67,7 @@ def retinex_edgemask(src: vs.VideoNode,
     return core.akarin.Expr([kirsch1, kirsch2, kirsch3, kirsch4, tcanny], expr_brz if brz > 0 else expr)
 
 
-def dehalo_mask(src: vs.VideoNode, expand: float = 0.5, iterations: int = 2, brz: int = 255) -> vs.VideoNode:
+def dehalo_mask(src: vs.VideoNode, expand: float = 0.5, iterations: int = 2, brz: int = 255, shift: int = 8) -> vs.VideoNode:
     """
     Based on muvsfunc.YAHRmask(), stand-alone version with some tweaks.
 
@@ -75,13 +75,14 @@ def dehalo_mask(src: vs.VideoNode, expand: float = 0.5, iterations: int = 2, brz
     :param expand: Expansion of edge mask.
     :param iterations: Protects parallel lines and corners that are usually damaged by YAHR.
     :param brz: Adjusts the internal line thickness.
+    :param shift: Corrective shift for fine-tuning iterations
     """
     if brz > 255 or brz < 0:
         raise ValueError('dehalo_mask: brz must be between 0 and 255.')
 
     src_b = depth(src, 8)
     luma = get_y(src_b)
-    vEdge = core.std.Expr([luma, luma.std.Maximum().std.Maximum()], ['y x - 8 - 128 *'])
+    vEdge = core.std.Expr([luma, luma.std.Maximum().std.Maximum()], [f'y x - {shift} - 128 *'])
     mask1 = vEdge.tcanny.TCanny(sigma=sqrt(expand*2), mode=-1).std.Expr(['x 16 *'])
     mask2 = iterate(vEdge, core.std.Maximum, iterations)
     mask2 = iterate(mask2, core.std.Minimum, iterations)
