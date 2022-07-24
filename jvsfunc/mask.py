@@ -12,6 +12,33 @@ import vapoursynth as vs
 core = vs.core
 
 
+def clahe_edgemask(src: vs.VideoNode,
+                   tcanny_sigma: float | int = 1,
+                   clahe_limit: float | int = 2000,
+                   clahe_tile: int = 5,
+                   brz: int = 8000) -> vs.VideoNode:
+    """
+    Like retinex_edgemask, but using CLAHE.
+
+    :param src: Input clip.
+    :param tcanny_sigma: sigma of tcanny.
+    :param clahe_limit: Threshold for contrast limiting.
+    :param clahe_tile: Tile size for histogram equalization.
+    :param brz: if brz > 0 output will be binarized (brz uses 16-bit scale).
+    """
+    luma16 = depth(get_y(src), 16)
+    clahe = luma16.ehist.CLAHE(clahe_limit, clahe_tile)
+    tcanny = clahe.tcanny.TCanny(mode=1, sigma=tcanny_sigma).std.Minimum(coordinates=[1, 0, 1, 0, 0, 1, 0, 1])
+    kirsch1 = luma16.std.Convolution(matrix=[5,  5,  5, -3,  0, -3, -3, -3, -3], saturate=False)
+    kirsch2 = luma16.std.Convolution(matrix=[-3,  5,  5, -3,  0,  5, -3, -3, -3], saturate=False)
+    kirsch3 = luma16.std.Convolution(matrix=[-3, -3,  5, -3,  0,  5, -3, -3,  5], saturate=False)
+    kirsch4 = luma16.std.Convolution(matrix=[-3, -3, -3, -3,  0,  5, -3,  5,  5], saturate=False)
+    expr = 'x y z a max max max b + 65535 min'
+    expr_brz = f'x y z a max max max b + {brz} > 65535 0 ?'
+    mask = core.akarin.Expr([kirsch1, kirsch2, kirsch3, kirsch4, tcanny], expr_brz if brz > 0 else expr)
+    return depth(mask, get_depth(src), dither_type=Dither.NONE, range_in=Range.FULL, range=Range.FULL)
+
+
 def flat_mask(src: vs.VideoNode, radius: int = 5, thr: int = 3, use_gauss: bool = False) -> vs.VideoNode:
     """
     Binarizes the image using thresholding for a pixel based on a small region around it.
