@@ -50,7 +50,7 @@ def retinex(src: vs.VideoNode,
     expr_msr = expr_msr + f"{'+ ' * (slen-1)}log {slen} /"
     blur_list = [gauss_blur(luma_float, i) for i in sigmas]
     msr = core.akarin.Expr([luma_float] + blur_list, expr_msr)
-    msr_stats = msr.psm.PlaneStatsMod(lower_thr, upper_thr)
+    msr_stats = msr.psm.PlaneMinMax(lower_thr, upper_thr)
     expr_balance = "x x.PlaneStatsMin - x.PlaneStatsMax x.PlaneStatsMin - /"
 
     if not is_float:
