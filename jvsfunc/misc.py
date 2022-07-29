@@ -51,7 +51,7 @@ def retinex(src: vs.VideoNode,
     blur_list = [gauss_blur(luma_float, i) for i in sigmas]
     msr = core.akarin.Expr([luma_float] + blur_list, expr_msr)
     msr_stats = msr.psm.PlaneMinMax(lower_thr, upper_thr)
-    expr_balance = "x x.PlaneStatsMin - x.PlaneStatsMax x.PlaneStatsMin - /"
+    expr_balance = "x x.psmMin - x.psmMax x.psmMin - /"
 
     if not is_float:
         _floor = scale_value(16, 8, get_depth(luma))
