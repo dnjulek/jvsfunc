@@ -163,32 +163,22 @@ def vinverse(src: vs.VideoNode,
     :param vinverse2: Use Vinverse2 mode.
     """
 
-    neutral = get_neutral_value(src, chroma=True)
-
-    expr = [f'x y - {neutral} + vbd! '  # vblurD
-            f'y y z - {sstr} * + round '  # vshrp
-            f'y - {neutral} + vsd! '  # vshrpD
-            f'vsd@ {neutral} - vbd@ {neutral} - * 0 < vsd@ {neutral} - abs '  # vlimD
-            f'vbd@ {neutral} - abs < vsd@ vbd@ ? {neutral} - {scl} * {neutral} + '  # vlimD
-            f'vsd@ {neutral} - abs vbd@ {neutral} - abs < vsd@ vbd@ ? ? round '  # vlimD
-            f'y {neutral} - +']  # last
-
-    if src.format.sample_type == vs.FLOAT:
-        expr = [i.replace('round ', '') for i in expr]
-
-    blur = src.std.Convolution([50, 99, 50], mode=mode, planes=planes)
-    blur2 = blur.std.Convolution([1, 4, 6, 4, 1], mode=mode, planes=planes)
+    expr = f'y y z - {sstr} * + '
+    expr += 'y - D1! x y - D2! D1@ abs D1A! D2@ abs D2A! '
+    expr += f'D1@ D2@ xor D1A@ D2A@ < D1@ D2@ ? {scl} * D1A@ D2A@ < D1@ D2@ ? ? y + '
 
     if vinverse2:
         blur = sbr(src, mode=mode, planes=planes)
         blur2 = blur.std.Convolution([1, 2, 1], mode=mode, planes=planes)
-
-    vnv = core.akarin.Expr([src, blur, blur2], _ex_planes(src, expr, planes))
+    else:
+        blur = src.std.Convolution([50, 99, 50], mode=mode, planes=planes)
+        blur2 = blur.std.Convolution([1, 4, 6, 4, 1], mode=mode, planes=planes)
 
     if amnt <= 0:
         return src
     elif amnt < 255:
         amn = scale_value(amnt, 8, get_depth(src))
-        expr = [f'x {amn} + y < x {amn} + x {amn} - y > x {amn} - y ? ?']
-        vnv = core.akarin.Expr([src, vnv], _ex_planes(src, expr, planes))
+        expr += f'LIM! x {amn} + LIM@ < x {amn} + x {amn} - LIM@ > x {amn} - LIM@ ? ?'
+    
+    vnv = core.akarin.Expr([src, blur, blur2], _ex_planes(src, [expr], planes))
     return vnv
