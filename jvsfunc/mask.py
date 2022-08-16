@@ -5,7 +5,7 @@ Masks functions
 from __future__ import annotations
 
 from vsutil import depth, iterate, get_depth, get_y, get_peak_value, scale_value, Dither, Range
-from typing import Sequence
+from typing import List
 from .misc import retinex
 from math import sqrt
 import vapoursynth as vs
@@ -70,7 +70,7 @@ def flat_mask(src: vs.VideoNode, radius: int = 5, thr: int = 3, use_gauss: bool 
 
 def retinex_edgemask(src: vs.VideoNode,
                      tcanny_sigma: float | int = 1,
-                     retinex_sigmas: Sequence[float | int] = [50, 200, 350],
+                     retinex_sigmas: List[float | int] = [50, 200, 350],
                      brz: int = 8000) -> vs.VideoNode:
     """
     retinex_edgemask from kagefunc using jvsfunc.retinex rather than the plugin.
