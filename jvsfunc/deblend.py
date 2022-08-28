@@ -163,8 +163,7 @@ def vinverse(src: vs.VideoNode,
     :param vinverse2: Use Vinverse2 mode.
     """
 
-    expr = f'y y z - {sstr} * + '
-    expr += 'y - D1! x y - D2! D1@ abs D1A! D2@ abs D2A! '
+    expr = f'y z - {sstr} * D1! x y - D2! D1@ abs D1A! D2@ abs D2A! '
     expr += f'D1@ D2@ xor D1A@ D2A@ < D1@ D2@ ? {scl} * D1A@ D2A@ < D1@ D2@ ? ? y + '
 
     if vinverse2:
