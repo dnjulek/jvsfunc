@@ -27,10 +27,11 @@ def select_lesscombed(src: List[vs.VideoNode], cthresh=6, mthresh=0, metric=0) -
     :param mthresh: Motion adaptive threshold.
     :param metric: Sets which spatial combing metric is used to detect combed pixels.
     """
+    srcr = range(len(src))
     mask = [comb_mask(i, cthresh=cthresh, mthresh=mthresh, metric=metric, planes=[0]).std.PlaneStats() for i in src]
 
     def _select(n: int, f: List[vs.VideoFrame], srcs: List[vs.VideoNode]) -> vs.VideoNode:
-        avg = [f[i].props["PlaneStatsAverage"] for i in [0, 1, 2, 3]]
+        avg = [f[i].props["PlaneStatsAverage"] for i in srcr]
         return srcs[avg.index(min(avg))]  # type:ignore
 
     return core.std.FrameEval(src[0], partial(_select, srcs=src), mask)
