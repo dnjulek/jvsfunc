@@ -58,6 +58,11 @@ def comb_mask(src: vs.VideoNode,
                    Metric 1 is from Donald Graft's decomb.dll.
     :param planes: Planes to process.
     """
+    cth_max = 65025 if metric else 255
+    if (cthresh > cth_max) or (cthresh < 0):
+        raise ValueError(f'comb_mask: cthresh must be between 0 and {cth_max} when metric = {metric}.')
+    if (mthresh > 255) or (mthresh < 0):
+        raise ValueError('comb_mask: mthresh must be between 0 and 255.')
 
     peak = get_peak_value(src)
     ex_m0 = [f'x[0,-2] a! x[0,-1] b! x c! x[0,1] d! x[0,2] e! '
