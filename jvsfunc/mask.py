@@ -77,11 +77,17 @@ def comb_mask(src: vs.VideoNode,
     ex_spatial = ex_m1 if metric else ex_m0
 
     spatial_mask = src.akarin.Expr(_ex_planes(src, ex_spatial, planes))
+    if (mthresh == 0):
+        if not expand:
+            return spatial_mask
+        return spatial_mask.std.Maximum(planes=planes, coordinates=[0, 0, 0, 1, 1, 0, 0, 0])
+
     motion_mask = core.akarin.Expr([src, src[0] + src], _ex_planes(src, ex_motion, planes))
     motion_mask = motion_mask.std.Maximum(planes=planes, coordinates=[0, 1, 0, 0, 0, 0, 1, 0])
     comb_mask = core.akarin.Expr([spatial_mask, motion_mask], 'x y min')
     if not expand:
         return comb_mask
+
     return comb_mask.std.Maximum(planes=planes, coordinates=[0, 0, 0, 1, 1, 0, 0, 0])
 
 
