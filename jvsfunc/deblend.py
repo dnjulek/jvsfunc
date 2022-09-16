@@ -27,7 +27,7 @@ def _jdeblend_eval(n: int, f: List[vs.VideoFrame], src: vs.VideoNode, inters: Li
     pattern = n % 5
     if comb[0] == 1:
         src = inters[pattern]
-    return src[n+1] if sum(comb) == 2 else src
+    return src[n+1] if sum(comb) == 2 else src  # type:ignore
 
 
 def jdeblend(src_fm: vs.VideoNode, src: vs.VideoNode, vnv: bool = True) -> vs.VideoNode:
@@ -98,7 +98,7 @@ def jdeblend_kf(src: vs.VideoNode, src_fm: vs.VideoNode) -> vs.VideoNode:
     def keyframe(n: int, f: List[vs.VideoFrame], src: vs.VideoNode):
         keyfm = [f[i].props['VFMSceneChange'] for i in [0, 1]]
         kf_end = keyfm[0] > keyfm[1]  # type:ignore
-        kf_start = sum(keyfm) == 2
+        kf_start = sum(keyfm) == 2  # type:ignore
         is_cmb = f[0].props['_Combed'] == 1
         src = src[n-1] if kf_end and is_cmb else src
         return src[n+1] if kf_start and is_cmb else src
