@@ -2,6 +2,7 @@
 
 from .blur import *
 from .deblend import *
+from .deinterlace import *
 from .denoise import *
 from .dotcrawl import *
 from .find import *
