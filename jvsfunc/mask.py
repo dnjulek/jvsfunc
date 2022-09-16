@@ -5,9 +5,10 @@ Masks functions
 from __future__ import annotations
 
 from vsutil import depth, iterate, get_depth, get_y, get_peak_value, scale_value, Dither, Range
-from typing import List
+from .util import _ex_planes
 from .misc import retinex
 from math import sqrt
+from typing import List
 import vapoursynth as vs
 core = vs.core
 
@@ -37,6 +38,46 @@ def clahe_edgemask(src: vs.VideoNode,
     expr_brz = f'x y z a max max max b + {brz} > 65535 0 ?'
     mask = core.akarin.Expr([kirsch1, kirsch2, kirsch3, kirsch4, tcanny], expr_brz if brz > 0 else expr)
     return depth(mask, get_depth(src), dither_type=Dither.NONE, range_in=Range.FULL, range=Range.FULL)
+
+
+def comb_mask(src: vs.VideoNode,
+              cthresh: int = 6,
+              mthresh: int = 9,
+              expand: bool = True,
+              metric: int = 0,
+              planes: int = 0) -> vs.VideoNode:
+    """
+    Comb mask from TIVTC/TFM plugin.
+
+    :param src: Input clip.
+    :param cthresh: Spatial combing threshold.
+    :param mthresh: Motion adaptive threshold.
+    :param expand: Assume left and right pixels of combed pixel as combed too.
+    :param metric: Sets which spatial combing metric is used to detect combed pixels.
+                   Metric 0 is what TFM used previous to v0.9.12.0.
+                   Metric 1 is from Donald Graft's decomb.dll.
+    :param planes: Planes to process.
+    """
+
+    peak = get_peak_value(src)
+    ex_m0 = [f'x[0,-2] a! x[0,-1] b! x c! x[0,1] d! x[0,2] e! '
+             f'c@ b@ - d1! c@ d@ - d2! '
+             f'c@ 4 * a@ + e@ + b@ d@ + 3 * - abs fd! '
+             f'd1@ {cthresh} > d2@ {cthresh} > and '
+             f'd1@ -{cthresh} < d2@ -{cthresh} < and or '
+             f'fd@ {cthresh * 6} > and {peak} 0 ?']
+
+    ex_m1 = [f'x[0,-1] x - x[0,1] x - * {cthresh} > {peak} 0 ?']
+    ex_motion = [f'x y - abs {mthresh} > {peak} 0 ?']
+    ex_spatial = ex_m1 if metric else ex_m0
+
+    spatial_mask = src.akarin.Expr(_ex_planes(src, ex_spatial, planes))
+    motion_mask = core.akarin.Expr([src, src[0] + src], _ex_planes(src, ex_motion, planes))
+    motion_mask = motion_mask.std.Maximum(planes=planes, coordinates=[0, 1, 0, 0, 0, 0, 1, 0])
+    comb_mask = core.akarin.Expr([spatial_mask, motion_mask], 'x y min')
+    if not expand:
+        return comb_mask
+    return comb_mask.std.Maximum(planes=planes, coordinates=[0, 0, 0, 1, 1, 0, 0, 0])
 
 
 def flat_mask(src: vs.VideoNode, radius: int = 5, thr: int = 3, use_gauss: bool = False) -> vs.VideoNode:

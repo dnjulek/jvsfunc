@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from functools import partial
 from typing import List, Sequence
-from vsutil import get_neutral_value, scale_value, get_depth
+from vsutil import scale_value, get_depth
 from .util import _ex_planes
 from .blur import sbr
 import vapoursynth as vs
@@ -178,6 +178,6 @@ def vinverse(src: vs.VideoNode,
     elif amnt < 255:
         amn = scale_value(amnt, 8, get_depth(src))
         expr += f'LIM! x {amn} + LIM@ < x {amn} + x {amn} - LIM@ > x {amn} - LIM@ ? ?'
-    
+
     vnv = core.akarin.Expr([src, blur, blur2], _ex_planes(src, [expr], planes))
     return vnv
