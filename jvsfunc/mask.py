@@ -3,12 +3,12 @@ Masks functions
 """
 
 from __future__ import annotations
+from typing import List, Sequence
 
 from vsutil import depth, iterate, get_depth, get_y, get_peak_value, scale_value, Dither, Range
 from .util import _ex_planes
 from .misc import retinex
 from math import sqrt
-from typing import List
 import vapoursynth as vs
 core = vs.core
 
@@ -45,7 +45,8 @@ def comb_mask(src: vs.VideoNode,
               mthresh: int = 9,
               expand: bool = True,
               metric: int = 0,
-              planes: int = 0) -> vs.VideoNode:
+              planes: int | Sequence[int] | None = None
+              ) -> vs.VideoNode:
     """
     Comb mask from TIVTC/TFM plugin.
 
