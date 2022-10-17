@@ -24,7 +24,11 @@ def ddcomb(src: vs.VideoNode, **frfun7over: Any) -> vs.VideoNode:
     :param frfun7over: Frfun7 parameter overrides.
     """
 
-    from lvsfunc.util import padder
+    def padding(src: vs.VideoNode, left: int = 0, right: int = 0, top: int = 0, bottom: int = 0) -> vs.VideoNode:
+        width = src.width + left + right
+        height = src.height + top + bottom
+        return src.resize.Point(width, height, src_left=-left, src_top=-top, src_width=width, src_height=height)
+
     frfun7args: Dict[str, Any] = dict(l=1.01, t=8.0, p=0, tp1=0, r1=3)
     frfun7args.update(frfun7over)
 
@@ -33,7 +37,7 @@ def ddcomb(src: vs.VideoNode, **frfun7over: Any) -> vs.VideoNode:
     v2 = v1 + v1
     v3 = v2 + v1
     n = get_neutral_value(src, chroma=True)
-    luma = padder(luma, left=4, right=4, top=0, bottom=0)
+    luma = padding(luma, left=4, right=4, top=0, bottom=0)
     w, h = luma.width, luma.height
 
     clean1 = luma.std.SeparateFields(True)

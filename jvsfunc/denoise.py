@@ -15,8 +15,7 @@ def ccd(src: vs.VideoNode,
         mode: int = 1,
         scale: float | int = 0,
         debug: bool = False,
-        matrix: int | None = None,
-        **kwargs: Any) -> vs.VideoNode:
+        matrix: int | None = None) -> vs.VideoNode:
     """
     Yet another Camcorder Color Denoise implementation.
 
@@ -26,23 +25,19 @@ def ccd(src: vs.VideoNode,
                  mode=1: bicubic to chroma resolution, and then back to YUV with bicubic.
                  mode=2: bicubic to luma resolution, and then back to YUV with bicubic.
                  mode=3: nnedi3 to luma resolution, and then back to YUV with bicubic.
-                 mode=4: nnedi3 to luma resolution, and then back to YUV with ssim_downsample.
     :param scale: Scale the matrix size for convolution, scale=1 enables the automatic resize and scale=0 disables it.
                   You can also use custom values like scale=1.5 for a matrix 50% bigger than the original.
                   The original matrix size is 25x25 for a 320x240 chroma.
                   Chroma size depends on the mode, so enable debug before using a custom value.
     :param debug: Shows the scale used (including automatic one from scale=1) and the matrix size.
     :param matrix: YUV matrix coefficient. If None, 1 will be used for HD and 6 for SD.
-    :param kwargs: Arguments passed to ssim_downsample.
     """
 
-    from lvsfunc.scale import ssim_downsample
-    from lvsfunc.util import get_prop
     if src.format.color_family == vs.GRAY:
         raise ValueError('ccd: GRAY format is not supported.')
 
-    if mode not in [1, 2, 3, 4]:
-        raise ValueError('ccd: Not supported mode, use 1, 2, 3 or 4.')
+    if mode not in [1, 2, 3]:
+        raise ValueError('ccd: Not supported mode, use 1, 2 or 3.')
 
     thr = threshold**2/195075.0
 
@@ -60,7 +55,7 @@ def ccd(src: vs.VideoNode,
         guess = 1 if src.width > 1270 or src.height > 710 else 6
 
         if "_Matrix" in frame.props:
-            matrix = get_prop(frame, "_Matrix", int)
+            matrix = frame.props["_Matrix"]
         else:
             matrix = guess
         return guess if matrix == 2 else matrix
@@ -132,16 +127,10 @@ def ccd(src: vs.VideoNode,
             elif mode == 2:
                 rgbs = src.resize.Bicubic(format=vs.RGBS, matrix_in=matrix)
                 den = expr(rgbs, scale).resize.Bicubic(format=src.format.id, matrix=matrix)
-            elif mode == 3:
-                rgbs = nnrgb(src, matrix)
-                den = expr(rgbs, scale).resize.Bicubic(format=src.format.id, matrix=matrix)
             else:
                 rgbs = nnrgb(src, matrix)
-                den = expr(rgbs, scale).resize.Bicubic(format=vs.YUV444PS, matrix=matrix, src_left=-0.5)
-                u = ssim_downsample(plane(den, 1), cw, ch, **kwargs)
-                v = ssim_downsample(plane(den, 2), cw, ch, **kwargs)
-                den = core.std.ShufflePlanes([den, u, v], [0, 0, 0], vs.YUV)
-                den = den.resize.Point(format=src.format.id)
+                den = expr(rgbs, scale).resize.Bicubic(format=src.format.id, matrix=matrix)
+                
         else:
             rgbs = src.resize.Bicubic(format=vs.RGBS, matrix_in=matrix)
             den = expr(rgbs, scale).resize.Bicubic(format=src.format.id, matrix=matrix)
