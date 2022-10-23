@@ -45,7 +45,8 @@ def retinex(src: vs.VideoNode,
 
     if fast:
         expr_msr = expr_msr + "x.PlaneStatsMax 0 <= 1 x x.PlaneStatsMax / 1 + ? "
-        sigmas.remove(max(sigmas))
+        sigmas.sort()
+        sigmas = sigmas[:-1]
 
     expr_msr = expr_msr + f"{'+ ' * (slen-1)}log {slen} /"
     blur_list = [gauss_blur(luma_float, i) for i in sigmas]
