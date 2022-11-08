@@ -6,6 +6,7 @@ from .deinterlace import *
 from .denoise import *
 from .dotcrawl import *
 from .find import *
+from .helper import *
 from .mask import *
 from .misc import *
-from .helper import *
+from .util import *
