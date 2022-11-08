@@ -6,7 +6,7 @@ from __future__ import annotations
 from typing import List, Sequence
 
 from vsutil import depth, iterate, get_depth, get_y, get_peak_value, scale_value, Dither, Range
-from .util import _ex_planes
+from .helper import _ex_planes
 from .misc import retinex
 from math import sqrt
 import vapoursynth as vs

@@ -7,7 +7,7 @@ from __future__ import annotations
 from functools import partial
 from typing import List
 from vsutil import get_depth, get_y, scale_value, EXPR_VARS
-from .util import _morpho_matrix
+from .helper import _morpho_matrix
 import vapoursynth as vs
 core = vs.core
 

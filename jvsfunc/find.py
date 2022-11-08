@@ -4,7 +4,7 @@ Some functions to generate VSEdit Bookmarks file with a list of frames, to be us
 
 from __future__ import annotations
 
-from .util import _bookmarks, _rng
+from .helper import _bookmarks, _rng
 from vsutil import depth
 import operator as opr
 from typing import Any

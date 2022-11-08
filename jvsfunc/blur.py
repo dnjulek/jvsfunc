@@ -5,7 +5,7 @@ Blur functions
 from __future__ import annotations
 
 from typing import Sequence
-from .util import _ex_matrix, _ex_planes
+from .helper import _ex_matrix, _ex_planes
 from vsutil import get_neutral_value
 import vapoursynth as vs
 core = vs.core

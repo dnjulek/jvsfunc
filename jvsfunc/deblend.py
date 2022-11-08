@@ -7,7 +7,7 @@ from __future__ import annotations
 from functools import partial
 from typing import List, Sequence
 from vsutil import scale_value, get_depth
-from .util import _ex_planes
+from .helper import _ex_planes
 from .blur import sbr
 import vapoursynth as vs
 core = vs.core
