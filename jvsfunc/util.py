@@ -14,7 +14,8 @@ Range = int | None | Tuple[int | None, int | None]
 def rfs(clip_a: vs.VideoNode,
         clip_b: vs.VideoNode,
         ranges: Range | list[Range] | None,
-        exclusive: bool = False) -> vs.VideoNode:
+        exclusive: bool = False,
+        mismatch: bool = False) -> vs.VideoNode:
     """
     Replace frames.
 
@@ -22,6 +23,7 @@ def rfs(clip_a: vs.VideoNode,
     :param clip_b:          Replacement clip.
     :param ranges:          Ranges to replace clip_a with clip_b.
     :param exclusive:       Use exclusive ranges.
+    :param mismatch:        Allows variable format.
     """
     if ranges != 0 and not ranges:
         return clip_a
@@ -50,7 +52,7 @@ def rfs(clip_a: vs.VideoNode,
         return out
 
     def to_list(list_in: List[Tuple[int, int]]) -> List[int]:
-        shift = 1 + exclusive
+        shift = 1 - exclusive
         out = []
         for x in list_in:
             for y in range(x[0], x[1] + shift):
@@ -65,4 +67,4 @@ def rfs(clip_a: vs.VideoNode,
     if (fmax >= blen):
         raise ValueError(f"rfs: clip_b can't replace frame {fmax}, it has only {blen} frames.")
 
-    return core.replaceframes.RFS(clip_a, clip_b, flist)
+    return core.replaceframes.RFS(clip_a, clip_b, flist, mismatch)
