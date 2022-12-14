@@ -67,4 +67,4 @@ def rfs(clip_a: vs.VideoNode,
     if (fmax >= blen):
         raise ValueError(f"rfs: clip_b can't replace frame {fmax}, it has only {blen} frames.")
 
-    return core.replaceframes.RFS(clip_a, clip_b, flist, mismatch)
+    return core.julek.RFS(clip_a, clip_b, flist, mismatch)
